@@ -643,6 +643,9 @@ class OpenWltApp(tk.Tk):
         self.gui_settings = load_gui_settings()
         self._path_vars: dict[str, tk.StringVar] = {}
         self._keep_path_vars: dict[str, tk.BooleanVar] = {}
+        self._path_display_vars: dict[str, tk.StringVar] = {}
+        self._path_entry_widgets: dict[str, ttk.Entry] = {}
+        self._path_tail_vars: dict[str, tk.StringVar] = {}
 
         self.wlt_folder_var = tk.StringVar(value=self._initial_path("wlt_folder", DEFAULT_WLT_DIR))
         self.wlt_output_var = tk.StringVar(value=self._initial_path("wlt_output", OUTPUT_DIR))
@@ -734,6 +737,12 @@ class OpenWltApp(tk.Tk):
         style.configure("TCheckbutton", background=PANEL, foreground=TEXT)
         style.map("TCheckbutton", background=[("active", PANEL)], foreground=[("active", ACCENT)])
         style.configure("TEntry", fieldbackground=PANEL_2, foreground=TEXT, insertcolor=ACCENT, borderwidth=1)
+        style.configure("Path.TButton", background=ACCENT_2, foreground="#ffffff", padding=(6, 4), borderwidth=0, font=("Segoe UI", 9, "bold"))
+        style.map("Path.TButton", background=[("active", "#14b8a6"), ("disabled", "#223042")], foreground=[("disabled", "#65717d")])
+        style.configure("Path.TCheckbutton", background=PANEL, foreground=TEXT, padding=(0, 0), font=("Segoe UI", 9))
+        style.map("Path.TCheckbutton", background=[("active", PANEL)], foreground=[("active", ACCENT)])
+        style.configure("Path.TEntry", fieldbackground=PANEL_2, foreground=TEXT, insertcolor=ACCENT, borderwidth=1, padding=(2, 1))
+        style.configure("InlineSettings.TFrame", background=PANEL, borderwidth=0, relief="flat")
         style.configure("TCombobox", fieldbackground=PANEL_2, background=PANEL_2, foreground=TEXT, arrowcolor=ACCENT)
         style.map("TCombobox", fieldbackground=[("readonly", PANEL_2)], foreground=[("readonly", TEXT)])
         style.configure("Treeview", background=TABLE_BG, fieldbackground=TABLE_BG, foreground=TABLE_TEXT, rowheight=30, borderwidth=0, font=("Segoe UI", 9))
@@ -784,6 +793,37 @@ class OpenWltApp(tk.Tk):
 
     def _on_keep_path_toggle(self, key: str) -> None:
         self._save_gui_settings(update_pinned=bool(self._keep_path_vars[key].get()))
+
+    def _compact_path_tail(self, value: str, segments: int = 2) -> str:
+        text = value.strip().replace("\\", "/").rstrip("/")
+        if not text:
+            return "-"
+        parts = [part for part in text.split("/") if part]
+        if not parts:
+            return text
+        tail = "/".join(parts[-segments:])
+        return f".../{tail}" if len(parts) > segments else tail
+
+    def _register_path_entry(self, key: str, var: tk.StringVar, entry: ttk.Entry, tail_var: tk.StringVar) -> None:
+        self._path_display_vars[key] = var
+        self._path_entry_widgets[key] = entry
+        self._path_tail_vars[key] = tail_var
+        var.trace_add("write", lambda *_args, key=key: self._refresh_path_display(key))
+        self._refresh_path_display(key)
+
+    def _refresh_path_display(self, key: str) -> None:
+        var = self._path_display_vars.get(key)
+        entry = self._path_entry_widgets.get(key)
+        tail_var = self._path_tail_vars.get(key)
+        if var is None:
+            return
+        if tail_var is not None:
+            tail_var.set(self._compact_path_tail(var.get()))
+        if entry is not None:
+            try:
+                entry.xview_moveto(1.0)
+            except tk.TclError:
+                pass
 
     def _build_ui(self) -> None:
         self.columnconfigure(0, weight=1)
@@ -893,15 +933,14 @@ class OpenWltApp(tk.Tk):
         ).grid(row=6, column=0, sticky="w", pady=(8, 4))
         self._path_row(controls, 7, "Allgemeiner Output-Ordner (optional)", self.multi_output_var, self._choose_multi_output, self.multi_output_keep_var, "multi_output")
 
-        settings_frame = ttk.Frame(controls, style="Panel.TFrame")
-        settings_frame.grid(row=9, column=0, sticky="ew", pady=(14, 4))
-        settings_frame.columnconfigure(1, weight=1)
+        settings_frame = ttk.Frame(controls, style="InlineSettings.TFrame")
+        settings_frame.grid(row=9, column=0, sticky="w", pady=(14, 4))
         ttk.Label(settings_frame, text="Mets/Bild", style="Panel.TLabel").grid(row=0, column=0, sticky="w", padx=(0, 8))
-        ttk.Entry(settings_frame, textvariable=self.multi_expected_fields_var, width=8).grid(row=0, column=1, sticky="w")
+        ttk.Entry(settings_frame, textvariable=self.multi_expected_fields_var, width=7).grid(row=0, column=1, sticky="w")
         ttk.Label(settings_frame, text="Ball-Perzentil", style="Panel.TLabel").grid(row=1, column=0, sticky="w", padx=(0, 8), pady=(8, 0))
-        ttk.Entry(settings_frame, textvariable=self.multi_ball_percentile_var, width=8).grid(row=1, column=1, sticky="w", pady=(8, 0))
+        ttk.Entry(settings_frame, textvariable=self.multi_ball_percentile_var, width=7).grid(row=1, column=1, sticky="w", pady=(8, 0))
         ttk.Label(settings_frame, text="Feldrand px", style="Panel.TLabel").grid(row=2, column=0, sticky="w", padx=(0, 8), pady=(8, 0))
-        ttk.Entry(settings_frame, textvariable=self.multi_margin_var, width=8).grid(row=2, column=1, sticky="w", pady=(8, 0))
+        ttk.Entry(settings_frame, textvariable=self.multi_margin_var, width=7).grid(row=2, column=1, sticky="w", pady=(8, 0))
         ttk.Checkbutton(controls, text="Messung in Verlauf-CSV schreiben", variable=self.multi_write_history_var).grid(row=10, column=0, sticky="w", pady=(8, 0))
 
         self.multi_button = ttk.Button(controls, text="Multi-Ball auswerten", style="Accent.TButton", command=self._start_multi_ball)
@@ -1020,18 +1059,24 @@ class OpenWltApp(tk.Tk):
         keep_key: str | None = None,
     ) -> None:
         ttk.Label(parent, text=label, style="Panel.TLabel").grid(row=row, column=0, sticky="w", pady=(0, 4))
-        frame = ttk.Frame(parent, style="Panel.TFrame")
+        frame = ttk.Frame(parent, style="Panel.TFrame", padding=(4, 4, 4, 3))
         frame.grid(row=row + 1, column=0, sticky="ew", pady=(0, 8))
         frame.columnconfigure(0, weight=1)
-        ttk.Entry(frame, textvariable=var, width=34).grid(row=0, column=0, sticky="ew", padx=(0, 8))
-        ttk.Button(frame, text="...", width=4, command=command).grid(row=0, column=1)
+        frame.columnconfigure(1, weight=0)
+        entry = ttk.Entry(frame, textvariable=var, width=12, style="Path.TEntry")
+        entry.grid(row=0, column=0, sticky="ew", padx=(0, 6), pady=(0, 3))
+        ttk.Button(frame, text="...", width=3, style="Path.TButton", command=command).grid(row=0, column=1, sticky="e", pady=(0, 3))
+        tail_var = tk.StringVar(value=self._compact_path_tail(var.get()))
+        ttk.Label(frame, textvariable=tail_var, style="PanelMuted.TLabel", anchor="w").grid(row=1, column=0, sticky="ew", padx=(2, 6))
         if keep_var is not None and keep_key is not None:
             ttk.Checkbutton(
                 frame,
                 text="keep",
                 variable=keep_var,
                 command=lambda key=keep_key: self._on_keep_path_toggle(key),
-            ).grid(row=0, column=2, sticky="e", padx=(8, 0))
+                style="Path.TCheckbutton",
+            ).grid(row=1, column=1, sticky="e")
+        self._register_path_entry(keep_key or f"path_{id(var)}", var, entry, tail_var)
 
     def _file_row(
         self,
