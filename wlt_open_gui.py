@@ -7,7 +7,9 @@ import io
 import json
 import os
 import queue
+import re
 import statistics
+import subprocess
 import sys
 import threading
 import time
@@ -36,10 +38,20 @@ WORKSPACE_DIR = PROJECT_DIR.parent
 DEFAULT_MULTI_IMAGE_DIR = PROJECT_DIR / "examples" / "multi_ball" / "rtimages"
 DEFAULT_MULTI_PLAN = PROJECT_DIR / "examples" / "multi_ball" / "rtplan.dcm"
 DEFAULT_WLT_DIR = PROJECT_DIR / "examples" / "standard_wlt"
-OUTPUT_DIR = PROJECT_DIR / "output"
+PERSISTENT_OUTPUT_ROOT = Path(r"\\medizin.uni-leipzig.de\data\Archiv\STR\STR-Physik\11. Scripting\Output")
+PERSISTENT_WLT_DIR = PERSISTENT_OUTPUT_ROOT / "WLT"
+PERSISTENT_NORMAL_OUTPUT_DIR = PERSISTENT_WLT_DIR / "Normal"
+PERSISTENT_MULTI_OUTPUT_DIR = PERSISTENT_WLT_DIR / "Multi"
+LOCAL_OUTPUT_DIR = PROJECT_DIR / "output"
+OUTPUT_DIR = PERSISTENT_WLT_DIR if PERSISTENT_OUTPUT_ROOT.exists() or PERSISTENT_WLT_DIR.exists() else LOCAL_OUTPUT_DIR
 APP_ICON_PATH = PROJECT_DIR / "assets" / "wlt_icon.ico"
 HISTORY_CSV = OUTPUT_DIR / "wlt_history.csv"
 GUI_SETTINGS_JSON = OUTPUT_DIR / "gui_settings.json"
+EXACTRAC_NULLING_HELP = (
+    "ExacTrac mm / 10 zum Tischwert addieren, Vorzeichen beibehalten.\n"
+    "Initial:  VRT -10.44 | LNG 91.74 | LAT 0.62 cm\n"
+    "Korrektur: VRT -0.9 | LNG +0.2 | LAT +0.3 mm -> Final: -10.53 | 91.76 | 0.65 cm"
+)
 HISTORY_COLUMNS = [
     "timestamp",
     "workflow",
@@ -84,28 +96,172 @@ def path_or_empty(path: Path) -> str:
     return str(path) if path.exists() else ""
 
 
+def dcm_file_count(folder: Path) -> int:
+    try:
+        return sum(1 for path in folder.iterdir() if path.is_file() and path.suffix.lower() == ".dcm")
+    except OSError:
+        return 0
+
+
+def clarify_single_image_iso_results(text: str) -> str:
+    lines: list[str] = []
+    single_image_axes: set[str] = set()
+    diameter_pattern = re.compile(r"^(Collimator|Couch) 2D isocenter diameter:\s*0\.00mm\s*\((\d+)/(\d+) images considered\)")
+    rms_pattern = re.compile(r"^Maximum (Collimator|Couch) RMS deviation")
+    for line in text.splitlines():
+        diameter_match = diameter_pattern.match(line)
+        if diameter_match and int(diameter_match.group(2)) < 2:
+            axis, used, total = diameter_match.groups()
+            single_image_axes.add(axis)
+            lines.append(f"{axis} 2D isocenter diameter: nicht auswertbar (nur {used}/{total} Bild; mind. 2 noetig)")
+            continue
+        rms_match = rms_pattern.match(line)
+        if rms_match and rms_match.group(1) in single_image_axes:
+            axis = rms_match.group(1)
+            lines.append(f"Maximum {axis} RMS deviation (mm): nicht auswertbar (nur 1 Bild)")
+            continue
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def normalize_timestamp_value(value: object) -> str:
+    text = str(value or "").strip()
+    match = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})", text)
+    if match:
+        year, month, day, hour, minute, second = match.groups()
+        return f"{year}{month}{day}-{hour}{minute}{second}"
+    return text
+
+
+def default_wlt_output_dir() -> Path:
+    return PERSISTENT_NORMAL_OUTPUT_DIR if PERSISTENT_OUTPUT_ROOT.exists() or PERSISTENT_NORMAL_OUTPUT_DIR.exists() else LOCAL_OUTPUT_DIR
+
+
+def default_multi_output_dir() -> Path:
+    return PERSISTENT_MULTI_OUTPUT_DIR if PERSISTENT_OUTPUT_ROOT.exists() or PERSISTENT_MULTI_OUTPUT_DIR.exists() else LOCAL_OUTPUT_DIR
+
+
+def normalize_path_text(value: str | Path) -> str:
+    return str(value).replace("/", "\\").strip().rstrip("\\").lower()
+
+
+def is_legacy_output_path(value: object) -> bool:
+    if not isinstance(value, str) or not value.strip():
+        return False
+    normalized = normalize_path_text(value)
+    return (
+        normalized == normalize_path_text(LOCAL_OUTPUT_DIR)
+        or normalized.endswith("\\wlt_v3.0_open\\output")
+        or normalized.endswith("\\etd-wlt-ukl\\output")
+        or normalized.endswith("\\etd-wlt-ukl_portable\\output")
+    )
+
+
+def is_persistent_output_path(value: object) -> bool:
+    if not isinstance(value, str) or not value.strip():
+        return False
+    normalized = normalize_path_text(value)
+    return normalized in {
+        normalize_path_text(PERSISTENT_OUTPUT_ROOT),
+        normalize_path_text(PERSISTENT_WLT_DIR),
+        normalize_path_text(PERSISTENT_NORMAL_OUTPUT_DIR),
+        normalize_path_text(PERSISTENT_MULTI_OUTPUT_DIR),
+    }
+
+
+def normalize_history_row(row: dict[str, str]) -> dict[str, str]:
+    cleaned = {str(key).lstrip("\ufeff").strip().strip('"'): (value or "") for key, value in row.items() if key is not None}
+    if not cleaned.get("timestamp", "").strip():
+        for key in ("Zeitpunkt", "zeitpunkt", "generated_at", "time", "date", "Datum", "datum"):
+            value = cleaned.get(key, "").strip()
+            if value:
+                cleaned["timestamp"] = value
+                break
+    if not cleaned.get("timestamp", "").strip():
+        joined = " ".join(cleaned.get(key, "") for key in ("pdf", "txt", "csv", "graph", "notes", "source"))
+        match = re.search(r"(\d{8}-\d{6}|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})", joined)
+        if match:
+            cleaned["timestamp"] = match.group(1)
+    cleaned["timestamp"] = normalize_timestamp_value(cleaned.get("timestamp", ""))
+    return cleaned
+
+
 def append_history_row(row: dict[str, object]) -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     exists = HISTORY_CSV.exists()
+    values = dict(row)
+    if not str(values.get("timestamp", "")).strip():
+        values["timestamp"] = time.strftime("%Y%m%d-%H%M%S")
+    values["timestamp"] = normalize_timestamp_value(values.get("timestamp", ""))
     with HISTORY_CSV.open("a", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=HISTORY_COLUMNS)
         if not exists:
             writer.writeheader()
-        writer.writerow({column: row.get(column, "") for column in HISTORY_COLUMNS})
+        writer.writerow({column: values.get(column, "") for column in HISTORY_COLUMNS})
 
 
 def load_history_rows() -> list[dict[str, str]]:
     if not HISTORY_CSV.exists():
         return []
-    with HISTORY_CSV.open("r", newline="", encoding="utf-8") as handle:
-        return list(csv.DictReader(handle))
+    with HISTORY_CSV.open("r", newline="", encoding="utf-8-sig") as handle:
+        return [normalize_history_row(row) for row in csv.DictReader(handle)]
+
+
+def pdf_open_unavailable_message(path: str | Path) -> str:
+    path = Path(path)
+    parts = ["PDF konnte nicht automatisch geoeffnet werden."]
+    if not path.exists():
+        parts.append(f"Datei wurde nicht gefunden: {path}.")
+    elif os.name == "nt":
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        try:
+            assoc = subprocess.run(
+                ["cmd.exe", "/d", "/c", "assoc", ".pdf"],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=3,
+                creationflags=flags,
+            )
+            assoc_text = ((assoc.stdout or "") + (assoc.stderr or "")).replace("\ufffd", "?").strip()
+            if assoc.returncode != 0:
+                parts.append("Grund: Windows hat keine .pdf-Dateizuordnung hinterlegt.")
+            elif assoc_text:
+                parts.append(f"Windows-Zuordnung gefunden: {assoc_text}.")
+            if assoc.returncode == 0 and "=" in assoc.stdout:
+                file_type = assoc.stdout.strip().split("=", 1)[1].strip()
+                ftype = subprocess.run(
+                    ["cmd.exe", "/d", "/c", "ftype", file_type],
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=3,
+                    creationflags=flags,
+                )
+                ftype_text = ((ftype.stdout or "") + (ftype.stderr or "")).replace("\ufffd", "?").strip()
+                if ftype_text:
+                    parts.append(f"Open-Befehl: {ftype_text}.")
+                elif ftype.returncode != 0:
+                    parts.append(f"Kein ftype-Open-Befehl fuer {file_type} gefunden.")
+        except Exception as exc:
+            parts.append(f"Diagnose der Windows-PDF-Zuordnung fehlgeschlagen: {exc}.")
+    parts.append("Bitte 'Output oeffnen' nutzen und die PDF dort manuell starten.")
+    return " ".join(parts)
 
 
 def load_gui_settings() -> dict[str, object]:
     if not GUI_SETTINGS_JSON.exists():
         return {}
     try:
-        return json.loads(GUI_SETTINGS_JSON.read_text(encoding="utf-8"))
+        settings = json.loads(GUI_SETTINGS_JSON.read_text(encoding="utf-8"))
+        if not isinstance(settings, dict):
+            return {}
+        settings, changed = migrate_gui_settings(settings)
+        if changed:
+            write_gui_settings(settings)
+        return settings
     except Exception:
         return {}
 
@@ -113,6 +269,26 @@ def load_gui_settings() -> dict[str, object]:
 def write_gui_settings(settings: dict[str, object]) -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     GUI_SETTINGS_JSON.write_text(json.dumps(settings, indent=2), encoding="utf-8")
+
+
+def migrate_gui_settings(settings: dict[str, object]) -> tuple[dict[str, object], bool]:
+    changed = False
+
+    def set_if_different(section: dict[str, object], key: str, value: str) -> None:
+        nonlocal changed
+        if normalize_path_text(section.get(key, "")) != normalize_path_text(value):
+            section[key] = value
+            changed = True
+
+    for section_name in ("paths", "pinned_paths"):
+        section = settings.get(section_name)
+        if not isinstance(section, dict):
+            continue
+        if is_legacy_output_path(section.get("wlt_output")) or is_persistent_output_path(section.get("wlt_output")):
+            set_if_different(section, "wlt_output", str(default_wlt_output_dir()))
+        if is_legacy_output_path(section.get("multi_output")) or is_persistent_output_path(section.get("multi_output")):
+            set_if_different(section, "multi_output", str(default_multi_output_dir()))
+    return settings, changed
 
 
 @contextlib.contextmanager
@@ -231,11 +407,11 @@ def shift_vector_values(wl: object, data: dict[str, object]) -> tuple[float | No
     return None, None, None
 
 
-def format_shift_cm(wl: object, data: dict[str, object]) -> str:
+def format_shift_mm(wl: object, data: dict[str, object]) -> str:
     x, y, z = shift_vector_values(wl, data)
     if None in (x, y, z):
         return "n/a"
-    return f"B-D: {z / 10:2.3f}; T-G: {y / 10:2.3f}; A-B: {x / 10:2.3f}"
+    return f"B-D: {z:2.2f}; T-G: {y:2.2f}; L-R: {x:2.2f}"
 
 
 def couch_position_text(wl: object, data: dict[str, object], recommended: bool = False) -> str:
@@ -541,23 +717,36 @@ def create_uke_summary_pdf(
             [
                 f"Maximum  \\  Median distance to BB (mm): {(max_bb or 0.0):2.2f}  \\  {(median_bb or 0.0):2.2f}",
                 f"Gantry 3D isocenter diameter (mm): {gantry_iso:2.2f}",
-                "Shift BB to radiation isocenter (cm):",
+                "Shift BB to radiation isocenter (mm):",
                 "Actual couch position in IEC-61217 (cm):",
                 "Recommended couch position (cm):",
             ]
         )
         value_lines = [
-            format_shift_cm(wl, data),
+            format_shift_mm(wl, data),
             couch_position_text(wl, data, recommended=False),
             couch_position_text(wl, data, recommended=True),
         ]
 
+    single_image_note = None
+    if 0 < num_gantry_coll < 2:
+        single_image_note = f"nicht auswertbar (nur {num_gantry_coll}/{num_total} Bild; mind. 2 noetig)"
+
     if gantry_coll_iso is not None and num_gantry_coll:
-        lines.append(f"Gantry+Collimator 3D isocenter diameter (mm): {gantry_coll_iso:.2f} ({num_gantry_coll}/{num_total} images considered)")
-    if coll_iso is not None and coll_iso > 0:
-        lines.append(f"Collimator 2D isocenter diameter (mm): {coll_iso:2.2f}")
-    if couch_iso is not None and couch_iso > 0:
-        lines.append(f"Couch 2D isocenter diameter (mm): {couch_iso:2.2f}")
+        if single_image_note:
+            lines.append(f"Gantry+Collimator 3D isocenter diameter (mm): {single_image_note}")
+        else:
+            lines.append(f"Gantry+Collimator 3D isocenter diameter (mm): {gantry_coll_iso:.2f} ({num_gantry_coll}/{num_total} images considered)")
+    if coll_iso is not None:
+        if single_image_note:
+            lines.append(f"Collimator 2D isocenter diameter (mm): {single_image_note}")
+        elif coll_iso > 0:
+            lines.append(f"Collimator 2D isocenter diameter (mm): {coll_iso:2.2f}")
+    if couch_iso is not None:
+        if single_image_note:
+            lines.append(f"Couch 2D isocenter diameter (mm): {single_image_note}")
+        elif couch_iso > 0:
+            lines.append(f"Couch 2D isocenter diameter (mm): {couch_iso:2.2f}")
 
     draw_text_lines(canvas, lines, 4, 25.5, font_size=12)
     if value_lines:
@@ -637,6 +826,8 @@ class OpenWltApp(tk.Tk):
         self.multi_mlc_index = 0
         self.multi_preview_mode = "image"
         self.multi_graph_path = ""
+        self.last_wlt_output_path: str = ""
+        self.last_multi_output_path: str = ""
         self._drain_after_id: str | None = None
         self._busy_animation_after_id: str | None = None
         self._busy_step = 0
@@ -648,7 +839,7 @@ class OpenWltApp(tk.Tk):
         self._path_tail_vars: dict[str, tk.StringVar] = {}
 
         self.wlt_folder_var = tk.StringVar(value=self._initial_path("wlt_folder", DEFAULT_WLT_DIR))
-        self.wlt_output_var = tk.StringVar(value=self._initial_path("wlt_output", OUTPUT_DIR))
+        self.wlt_output_var = tk.StringVar(value=self._initial_path("wlt_output", default_wlt_output_dir()))
         self.wlt_use_analysis_output_var = tk.BooleanVar(value=True)
         self.wlt_write_txt_var = tk.BooleanVar(value=True)
         self.wlt_write_pdf_var = tk.BooleanVar(value=True)
@@ -659,8 +850,8 @@ class OpenWltApp(tk.Tk):
 
         self.multi_image_var = tk.StringVar(value=self._initial_path("multi_image", DEFAULT_MULTI_IMAGE_DIR))
         self.multi_plan_var = tk.StringVar(value=self._initial_path("multi_plan", DEFAULT_MULTI_PLAN))
-        self.multi_output_var = tk.StringVar(value=self._initial_path("multi_output", OUTPUT_DIR))
-        self.multi_use_analysis_output_var = tk.BooleanVar(value=True)
+        self.multi_output_var = tk.StringVar(value=self._initial_path("multi_output", default_multi_output_dir()))
+        self.multi_use_analysis_output_var = tk.BooleanVar(value=False)
         self.multi_write_history_var = tk.BooleanVar(value=True)
         self.multi_expected_fields_var = tk.StringVar(value="3")
         self.multi_ball_percentile_var = tk.StringVar(value="1.0")
@@ -730,7 +921,7 @@ class OpenWltApp(tk.Tk):
         style.configure("PanelTitle.TLabel", background=PANEL, foreground=ACCENT, font=("Segoe UI", 13, "bold"))
         style.configure("Muted.TLabel", background=BG, foreground=MUTED)
         style.configure("PanelMuted.TLabel", background=PANEL, foreground=MUTED)
-        style.configure("TButton", background=ACCENT_2, foreground="#ffffff", padding=(13, 9), borderwidth=0, font=("Segoe UI", 10, "bold"))
+        style.configure("TButton", background=ACCENT_2, foreground="#ffffff", padding=(12, 7), borderwidth=0, font=("Segoe UI", 10, "bold"))
         style.map("TButton", background=[("active", "#14b8a6"), ("disabled", "#223042")], foreground=[("disabled", "#65717d")])
         style.configure("Accent.TButton", background=ACCENT, foreground="#06111d")
         style.map("Accent.TButton", background=[("active", "#67e8f9")], foreground=[("active", "#06111d")])
@@ -764,6 +955,10 @@ class OpenWltApp(tk.Tk):
         keep = bool(self._settings_dict("keep_paths").get(key, False))
         value = pinned_paths.get(key, "") if keep else paths.get(key, "")
         if isinstance(value, str) and value.strip():
+            if key == "wlt_output" and (is_legacy_output_path(value) or is_persistent_output_path(value)):
+                return str(default_wlt_output_dir())
+            if key == "multi_output" and (is_legacy_output_path(value) or is_persistent_output_path(value)):
+                return str(default_multi_output_dir())
             return value
         if key.endswith("output"):
             return str(default)
@@ -829,10 +1024,10 @@ class OpenWltApp(tk.Tk):
         self.columnconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
 
-        header = tk.Frame(self, bg=BG, padx=30, pady=22)
+        header = tk.Frame(self, bg=BG, padx=24, pady=14)
         header.grid(row=0, column=0, sticky="ew")
         header.columnconfigure(0, weight=1)
-        tk.Label(header, text="WINSTON-LUTZ ANALYSE", bg=BG, fg=ACCENT, font=("Segoe UI", 27, "bold")).grid(row=0, column=0, sticky="w")
+        tk.Label(header, text="WINSTON-LUTZ ANALYSE", bg=BG, fg=ACCENT, font=("Segoe UI", 24, "bold")).grid(row=0, column=0, sticky="w")
         tk.Label(
             header,
             text=f"{APP_TITLE} | Open-source source tree | pylinac v{pylinac.__version__}",
@@ -848,10 +1043,10 @@ class OpenWltApp(tk.Tk):
         self.busy_progress.grid_remove()
 
         separator = tk.Frame(header, bg=ACCENT, height=2)
-        separator.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(16, 0))
+        separator.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(10, 0))
 
         notebook = ttk.Notebook(self)
-        notebook.grid(row=1, column=0, sticky="nsew", padx=30, pady=(0, 30))
+        notebook.grid(row=1, column=0, sticky="nsew", padx=24, pady=(0, 18))
         self.notebook = notebook
 
         self.wlt_tab = ttk.Frame(notebook)
@@ -869,8 +1064,8 @@ class OpenWltApp(tk.Tk):
         self.wlt_tab.columnconfigure(1, weight=1)
         self.wlt_tab.rowconfigure(0, weight=1)
 
-        controls = ttk.Frame(self.wlt_tab, style="Panel.TFrame", padding=22)
-        controls.grid(row=0, column=0, sticky="nsw", padx=(0, 18))
+        controls = ttk.Frame(self.wlt_tab, style="Panel.TFrame", padding=14)
+        controls.grid(row=0, column=0, sticky="nsw", padx=(0, 14))
         controls.columnconfigure(0, weight=1)
 
         ttk.Label(controls, text="WLT MIT PYLINAC", style="PanelTitle.TLabel").grid(row=0, column=0, sticky="w")
@@ -879,26 +1074,34 @@ class OpenWltApp(tk.Tk):
             text="Nutzt die aktuelle pylinac-WinstonLutz-Klasse und erzeugt optional einen PDF-Report.",
             style="PanelMuted.TLabel",
             wraplength=320,
-        ).grid(row=1, column=0, sticky="w", pady=(4, 18))
+        ).grid(row=1, column=0, sticky="w", pady=(2, 8))
 
         self._path_row(controls, 2, "Analyseordner", self.wlt_folder_var, self._choose_wlt_folder, self.wlt_folder_keep_var, "wlt_folder")
         ttk.Checkbutton(
             controls,
             text="Output im Analyseordner speichern",
             variable=self.wlt_use_analysis_output_var,
-        ).grid(row=4, column=0, sticky="w", pady=(8, 4))
+        ).grid(row=4, column=0, sticky="w", pady=(4, 2))
         self._path_row(controls, 5, "Allgemeiner Output-Ordner (optional)", self.wlt_output_var, self._choose_wlt_output, self.wlt_output_keep_var, "wlt_output")
 
-        ttk.Label(controls, text="Dateien", style="Panel.TLabel").grid(row=7, column=0, sticky="w", pady=(14, 4))
-        ttk.Checkbutton(controls, text="TXT-Zusammenfassung schreiben", variable=self.wlt_write_txt_var).grid(row=8, column=0, sticky="w", pady=(0, 3))
-        ttk.Checkbutton(controls, text="PDF-Report schreiben", variable=self.wlt_write_pdf_var).grid(row=9, column=0, sticky="w", pady=(0, 3))
-        ttk.Checkbutton(controls, text="Messung in Verlauf-CSV schreiben", variable=self.wlt_write_history_var).grid(row=10, column=0, sticky="w", pady=(0, 8))
+        ttk.Label(controls, text="Dateien", style="Panel.TLabel").grid(row=7, column=0, sticky="w", pady=(8, 2))
+        ttk.Checkbutton(controls, text="TXT-Zusammenfassung schreiben", variable=self.wlt_write_txt_var).grid(row=8, column=0, sticky="w", pady=(0, 1))
+        ttk.Checkbutton(controls, text="PDF-Report schreiben", variable=self.wlt_write_pdf_var).grid(row=9, column=0, sticky="w", pady=(0, 1))
+        ttk.Checkbutton(controls, text="Messung in Verlauf-CSV schreiben", variable=self.wlt_write_history_var).grid(row=10, column=0, sticky="w", pady=(0, 4))
 
-        ttk.Label(controls, text="Notiz", style="Panel.TLabel").grid(row=11, column=0, sticky="w", pady=(8, 4))
-        ttk.Entry(controls, textvariable=self.wlt_notes_var, width=42).grid(row=12, column=0, sticky="ew")
+        ttk.Label(controls, text="ExacTrac-Nulling", style="Panel.TLabel").grid(row=11, column=0, sticky="w", pady=(4, 2))
+        ttk.Label(
+            controls,
+            text=EXACTRAC_NULLING_HELP,
+            style="PanelMuted.TLabel",
+            wraplength=330,
+        ).grid(row=12, column=0, sticky="w", pady=(0, 4))
+
+        ttk.Label(controls, text="Notiz", style="Panel.TLabel").grid(row=13, column=0, sticky="w", pady=(4, 2))
+        ttk.Entry(controls, textvariable=self.wlt_notes_var, width=42).grid(row=14, column=0, sticky="ew")
         self.wlt_button = ttk.Button(controls, text="WLT auswerten", style="Accent.TButton", command=self._start_standard_wlt)
-        self.wlt_button.grid(row=13, column=0, sticky="ew", pady=(14, 6))
-        ttk.Button(controls, text="Output oeffnen", command=self._open_current_wlt_output).grid(row=14, column=0, sticky="ew")
+        self.wlt_button.grid(row=15, column=0, sticky="ew", pady=(8, 4))
+        ttk.Button(controls, text="Output oeffnen", command=self._open_current_wlt_output).grid(row=16, column=0, sticky="ew")
 
         log_panel = ttk.Frame(self.wlt_tab, style="Panel.TFrame", padding=14)
         log_panel.grid(row=0, column=1, sticky="nsew")
@@ -912,8 +1115,8 @@ class OpenWltApp(tk.Tk):
         self.multi_tab.columnconfigure(1, weight=1)
         self.multi_tab.rowconfigure(0, weight=1)
 
-        controls = ttk.Frame(self.multi_tab, style="Panel.TFrame", padding=22)
-        controls.grid(row=0, column=0, sticky="nsw", padx=(0, 18))
+        controls = ttk.Frame(self.multi_tab, style="Panel.TFrame", padding=14)
+        controls.grid(row=0, column=0, sticky="nsw", padx=(0, 14))
         controls.columnconfigure(0, weight=1)
 
         ttk.Label(controls, text="MULTI-BALL OFF-ISO", style="PanelTitle.TLabel").grid(row=0, column=0, sticky="w")
@@ -922,7 +1125,7 @@ class OpenWltApp(tk.Tk):
             text="Python-Auswertung fuer mehrere Subfelder: Feldzentrum, Kugelzentrum und Abstand je Subfeld.",
             style="PanelMuted.TLabel",
             wraplength=340,
-        ).grid(row=1, column=0, sticky="w", pady=(4, 18))
+        ).grid(row=1, column=0, sticky="w", pady=(2, 8))
 
         self._path_row(controls, 2, "RTIMAGE-Ordner", self.multi_image_var, self._choose_multi_image_dir, self.multi_image_keep_var, "multi_image")
         self._file_row(controls, 4, "RTPLAN optional", self.multi_plan_var, self._choose_multi_plan, self.multi_plan_keep_var, "multi_plan")
@@ -930,11 +1133,11 @@ class OpenWltApp(tk.Tk):
             controls,
             text="Output im RTIMAGE-Ordner speichern",
             variable=self.multi_use_analysis_output_var,
-        ).grid(row=6, column=0, sticky="w", pady=(8, 4))
+        ).grid(row=6, column=0, sticky="w", pady=(4, 2))
         self._path_row(controls, 7, "Allgemeiner Output-Ordner (optional)", self.multi_output_var, self._choose_multi_output, self.multi_output_keep_var, "multi_output")
 
         settings_frame = ttk.Frame(controls, style="InlineSettings.TFrame")
-        settings_frame.grid(row=9, column=0, sticky="w", pady=(14, 4))
+        settings_frame.grid(row=9, column=0, sticky="w", pady=(8, 2))
         ttk.Label(settings_frame, text="Mets/Bild", style="Panel.TLabel").grid(row=0, column=0, sticky="w", padx=(0, 8))
         ttk.Entry(settings_frame, textvariable=self.multi_expected_fields_var, width=7).grid(row=0, column=1, sticky="w")
         ttk.Label(settings_frame, text="Ball-Perzentil", style="Panel.TLabel").grid(row=1, column=0, sticky="w", padx=(0, 8), pady=(8, 0))
@@ -944,7 +1147,7 @@ class OpenWltApp(tk.Tk):
         ttk.Checkbutton(controls, text="Messung in Verlauf-CSV schreiben", variable=self.multi_write_history_var).grid(row=10, column=0, sticky="w", pady=(8, 0))
 
         self.multi_button = ttk.Button(controls, text="Multi-Ball auswerten", style="Accent.TButton", command=self._start_multi_ball)
-        self.multi_button.grid(row=11, column=0, sticky="ew", pady=(16, 6))
+        self.multi_button.grid(row=11, column=0, sticky="ew", pady=(10, 4))
         ttk.Button(controls, text="README im Explorer", command=lambda: self._open_path(PROJECT_DIR / "README.md")).grid(row=12, column=0, sticky="ew")
         ttk.Button(controls, text="Output oeffnen", command=self._open_current_multi_output).grid(row=13, column=0, sticky="ew", pady=(6, 0))
 
@@ -1058,14 +1261,14 @@ class OpenWltApp(tk.Tk):
         keep_var: tk.BooleanVar | None = None,
         keep_key: str | None = None,
     ) -> None:
-        ttk.Label(parent, text=label, style="Panel.TLabel").grid(row=row, column=0, sticky="w", pady=(0, 4))
-        frame = ttk.Frame(parent, style="Panel.TFrame", padding=(4, 4, 4, 3))
-        frame.grid(row=row + 1, column=0, sticky="ew", pady=(0, 8))
+        ttk.Label(parent, text=label, style="Panel.TLabel").grid(row=row, column=0, sticky="w", pady=(0, 2))
+        frame = ttk.Frame(parent, style="Panel.TFrame", padding=(3, 2, 3, 2))
+        frame.grid(row=row + 1, column=0, sticky="ew", pady=(0, 5))
         frame.columnconfigure(0, weight=1)
         frame.columnconfigure(1, weight=0)
         entry = ttk.Entry(frame, textvariable=var, width=12, style="Path.TEntry")
-        entry.grid(row=0, column=0, sticky="ew", padx=(0, 6), pady=(0, 3))
-        ttk.Button(frame, text="...", width=3, style="Path.TButton", command=command).grid(row=0, column=1, sticky="e", pady=(0, 3))
+        entry.grid(row=0, column=0, sticky="ew", padx=(0, 6), pady=(0, 1))
+        ttk.Button(frame, text="...", width=3, style="Path.TButton", command=command).grid(row=0, column=1, sticky="e", pady=(0, 1))
         tail_var = tk.StringVar(value=self._compact_path_tail(var.get()))
         ttk.Label(frame, textvariable=tail_var, style="PanelMuted.TLabel", anchor="w").grid(row=1, column=0, sticky="ew", padx=(2, 6))
         if keep_var is not None and keep_key is not None:
@@ -1125,10 +1328,14 @@ class OpenWltApp(tk.Tk):
         return Path(self.multi_image_var.get()) if self.multi_use_analysis_output_var.get() else Path(self.multi_output_var.get())
 
     def _open_current_wlt_output(self) -> None:
-        self._open_path(self._wlt_output_dir())
+        target = Path(self.last_wlt_output_path) if self.last_wlt_output_path else self._wlt_output_dir()
+        opened, message = self._open_path(target)
+        self._write(self.wlt_log, (message or "Output-Ordner in Explorer geoeffnet.") + "\n", "muted" if opened else "err")
 
     def _open_current_multi_output(self) -> None:
-        self._open_path(self._multi_output_dir())
+        target = Path(self.last_multi_output_path) if self.last_multi_output_path else self._multi_output_dir()
+        opened, message = self._open_path(target)
+        self._write(self.multi_log, (message or "Output-Ordner in Explorer geoeffnet.") + "\n", "muted" if opened else "err")
 
     def _detect_linac(self, folder: Path) -> str:
         try:
@@ -1285,7 +1492,10 @@ class OpenWltApp(tk.Tk):
             self.status_var.set("Bereit")
 
     def _choose_wlt_folder(self) -> None:
-        self._choose_dir(self.wlt_folder_var, "wlt_folder")
+        selected = self._choose_dir(self.wlt_folder_var, "wlt_folder")
+        if selected is not None and dcm_file_count(selected) >= 3 and not (self.worker and self.worker.is_alive()):
+            self.status_var.set("DICOM-Ordner erkannt, starte Analyse...")
+            self.after(80, self._start_standard_wlt)
 
     def _choose_wlt_output(self) -> None:
         self._choose_dir(self.wlt_output_var, "wlt_output")
@@ -1302,20 +1512,78 @@ class OpenWltApp(tk.Tk):
             self.multi_plan_var.set(filename)
             self._save_gui_settings(update_pinned=bool(self.multi_plan_keep_var.get()))
 
-    def _choose_dir(self, var: tk.StringVar, keep_key: str) -> None:
+    def _choose_dir(self, var: tk.StringVar, keep_key: str) -> Path | None:
         initial = var.get() if Path(var.get()).exists() else str(WORKSPACE_DIR)
         selected = filedialog.askdirectory(parent=self, initialdir=initial)
         if selected:
             var.set(selected)
             self._save_gui_settings(update_pinned=bool(self._keep_path_vars[keep_key].get()))
+            return Path(selected)
+        return None
 
-    def _open_path(self, path: str | Path) -> None:
+    def _open_path(self, path: str | Path) -> tuple[bool, str]:
         path = Path(path)
-        if path.exists():
+        if not path.exists():
+            return False, f"Pfad nicht gefunden: {path}"
+        try:
             if os.name == "nt":
-                os.startfile(str(path))
+                if path.is_dir():
+                    subprocess.Popen(
+                        ["explorer.exe", str(path)],
+                        close_fds=True,
+                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                    )
+                    return True, f"Explorer gestartet: {path}"
+                if path.suffix.lower() == ".pdf":
+                    errors: list[str] = []
+                    try:
+                        os.startfile(str(path))
+                        return True, "PDF-App gestartet."
+                    except Exception as exc:
+                        errors.append(f"os.startfile: {exc}")
+                    result = ctypes.windll.shell32.ShellExecuteW(None, "open", str(path), None, None, 1)
+                    if result > 32:
+                        return True, "PDF-App gestartet."
+                    errors.append(f"ShellExecuteW Fehlercode {result}")
+                    try:
+                        subprocess.Popen(
+                            ["cmd.exe", "/c", "start", "", str(path)],
+                            close_fds=True,
+                            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                        )
+                        return True, "PDF-Start ueber Windows start angestossen."
+                    except Exception as exc:
+                        errors.append(f"cmd start: {exc}")
+                    return False, "PDF konnte nicht per Windows-Dateizuordnung gestartet werden: " + " | ".join(errors)
+
+                result = ctypes.windll.shell32.ShellExecuteW(None, "open", str(path), None, str(path.parent), 1)
+                if result <= 32:
+                    raise OSError(f"ShellExecuteW Fehlercode {result}")
             else:
                 webbrowser.open(path.as_uri())
+            return True, ""
+        except Exception as exc:
+            if os.name == "nt" and path.suffix.lower() != ".pdf":
+                try:
+                    explorer_arg = f"/select,{path}" if path.is_file() else str(path)
+                    subprocess.Popen(
+                        ["explorer.exe", explorer_arg],
+                        close_fds=True,
+                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                    )
+                    return True, f"Windows-Open fehlgeschlagen, Explorer-Fallback genutzt: {exc}"
+                except Exception as explorer_exc:
+                    return False, f"Pfad konnte nicht geoeffnet werden: {exc}; Explorer-Fallback: {explorer_exc}"
+            try:
+                fallback_target = path.as_uri()
+            except ValueError:
+                fallback_target = str(path)
+            try:
+                if webbrowser.open(fallback_target):
+                    return True, f"Windows-Open fehlgeschlagen, Browser-Fallback genutzt: {exc}"
+            except Exception as fallback_exc:
+                return False, f"Pfad konnte nicht geoeffnet werden: {exc}; Fallback: {fallback_exc}"
+            return False, f"Pfad konnte nicht geoeffnet werden: {exc}"
 
     def _start_thread(self, target, args=()) -> None:
         if self.worker and self.worker.is_alive():
@@ -1401,7 +1669,7 @@ class OpenWltApp(tk.Tk):
             with quiet_future_warnings():
                 wl = WinstonLutz(str(folder))
                 wl.analyze()
-                result_text = wl.results()
+                result_text = clarify_single_image_iso_results(wl.results())
                 data = wl.results_data(as_dict=True)
             summary_path = ""
             if make_txt:
@@ -1590,6 +1858,7 @@ class OpenWltApp(tk.Tk):
                     self._write(self.multi_log, str(payload), "muted")
                 elif event == "wlt_done":
                     result_text, summary_path, pdf_path, output_path = payload
+                    self.last_wlt_output_path = str(output_path)
                     self._write(self.wlt_log, result_text + "\n\n", "ok")
                     self._write(self.wlt_log, f"Output: {output_path}\n", "muted")
                     self._write(self.wlt_log, f"TXT: {summary_path or 'deaktiviert'}\n", "muted")
@@ -1597,9 +1866,15 @@ class OpenWltApp(tk.Tk):
                     self._refresh_history()
                     self._set_busy(False)
                     if pdf_path:
-                        self._open_path(pdf_path)
+                        opened, open_message = self._open_path(pdf_path)
+                        if opened:
+                            self._write(self.wlt_log, (open_message or "PDF-App gestartet.") + "\n", "muted")
+                        else:
+                            self._write(self.wlt_log, f"{pdf_open_unavailable_message(pdf_path)} Ursache: {open_message}\n", "warn")
                 elif event == "multi_done":
                     summary = payload
+                    if getattr(summary, "output_csv", ""):
+                        self.last_multi_output_path = str(Path(summary.output_csv).parent)
                     self._write(self.multi_log, format_summary(summary) + "\n", "ok")
                     self.multi_preview_paths = list(summary.preview_pngs)
                     self.multi_mlc_paths = list(getattr(summary, "mlc_pngs", []))

@@ -600,7 +600,7 @@ def analyze_folder(
 
     all_distances = [field.distance_iso_mm for image in results for field in image.fields]
     summary = AnalysisSummary(
-        generated_at=datetime.now().isoformat(timespec="seconds"),
+        generated_at=timestamp,
         image_count=len(results),
         overall_max_distance_iso_mm=float(max(all_distances)),
         overall_mean_distance_iso_mm=float(np.mean(all_distances)),

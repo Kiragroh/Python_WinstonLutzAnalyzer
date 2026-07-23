@@ -1,6 +1,79 @@
-# WLT v3.0 Open
+# Winston-Lutz Analyzer
 
-Open-source Variante des WLT-Tools mit zwei Workflows:
+Dieses Repository enthaelt die Open-Source-Variante des WLT-Tools. Der produktive
+UKL-Stand wird als separate Portable-App betrieben; die wichtigsten Betriebs-,
+Ausgabe- und Verlaufspfade sind hier mit dokumentiert, damit sie auch im Hub
+direkt auffindbar sind.
+
+## UKL Schnellzugriff
+
+### Anleitung und Programmstand
+
+Die aktuelle Daily-WLT-Anleitung liegt hier:
+
+```text
+\\medizin.uni-leipzig.de\data\Archiv\STR\STR-Physik\11. Scripting\Standalone\ETD-WLT-UKL_Portable\Anleitung_WLT_Daily.pdf
+```
+
+Der verteilte Portable-Ordner im Netzwerk liegt direkt daneben:
+
+```text
+\\medizin.uni-leipzig.de\data\Archiv\STR\STR-Physik\11. Scripting\Standalone\ETD-WLT-UKL_Portable
+```
+
+Lokaler UKL-Arbeitsstand und Portable-Ausgabe:
+
+```text
+C:\Users\grohmanmax\Seafile\Meine Bibliothek\Scripts\WLT-Analysis\ETD-WLT-UKL_Portable
+```
+
+Der bearbeitbare Python-Quellstand liegt im benachbarten Ordner:
+
+```text
+C:\Users\grohmanmax\Seafile\Meine Bibliothek\Scripts\WLT-Analysis\ETD-WLT-UKL
+```
+
+Die Portable-App wurde fuer diese Dokumentationsaktualisierung nicht neu gebaut.
+
+### Aktueller UKL-Funktionsstand
+
+- Standard WLT mit UKL-PDF, Shift des BB zum Strahlenisozentrum in mm, Tischpositionen in cm und Richtung `L-R` statt `A-B`.
+- Geraetebezogener Translationsverlauf nach DICOM `ContentDate`/`ContentTime` fuer `L-R`, `T-G`, `B-D` und den 3D-Vektor.
+- Multi-Ball Off-Iso mit RTIMAGE-/RTPLAN-Zuordnung, Einzelbild-Previews, MLC-Ansichten sowie CSV-/JSON-Ausgabe.
+- Qualiformed-Verlauf je Geraet und Metrik mit Grenzwert, Metrikerlaeuterung, Statistik und direktem Sprung in die HTML-Auswertung.
+- Globale Standardpfade und `keep`-Schalter im Settings-Reiter.
+- Netzwerk-Ausgaben mit lokalem Fallback im sichtbaren Portable-Unterordner `output`.
+
+### Zentrale Ausgaben
+
+| Inhalt | Pfad |
+|---|---|
+| Standard-WLT Reports | `\\medizin.uni-leipzig.de\data\Archiv\STR\STR-Physik\11. Scripting\Output\WLT\Normal` |
+| Multi-Ball-Ausgaben | `\\medizin.uni-leipzig.de\data\Archiv\STR\STR-Physik\11. Scripting\Output\WLT\Multi` |
+| Gemeinsame Verlaufs-CSV | `\\medizin.uni-leipzig.de\data\Archiv\STR\STR-Physik\11. Scripting\Output\WLT\wlt_history.csv` |
+| Translationsverlauf PNG | `\\medizin.uni-leipzig.de\data\Archiv\STR\STR-Physik\11. Scripting\Output\WLT\wlt_translation_history.png` |
+| Qualiformed-Kurzverlauf PNG | `\\medizin.uni-leipzig.de\data\Archiv\STR\STR-Physik\11. Scripting\Output\WLT\qualiformed_wlt_history.png` |
+| Qualiformed Daten, Excel und Plots | `\\medizin.uni-leipzig.de\data\Archiv\STR\STR-Physik\3. QS\QS-Geräte\WLPlus_Auswertung` |
+| Qualiformed SQLite-Datenbank | `\\medizin.uni-leipzig.de\data\Archiv\STR\STR-Physik\3. QS\QS-Geräte\WLPlus_Auswertung\qualiformed_wlt_metrics.db` |
+| Qualiformed Gesamt-HTML | `\\medizin.uni-leipzig.de\data\Archiv\STR\STR-Physik\3. QS\QS-Geräte\WLPlus_Auswertung\html\gesamt_wlt_iso_trends.html` |
+
+### Aktuelle Verlaeufe
+
+Die folgenden anonymisierten Snapshots wurden am 23.07.2026 aus den zentralen
+Ausgaben uebernommen. Im klinischen Betrieb sind die oben genannten Netzwerkdateien
+die jeweils aktuelle Quelle.
+
+#### Translationsabweichungen Standard WLT
+
+![Aktueller Standard-WLT Translationsverlauf](docs/current/wlt_translation_history.png)
+
+#### Qualiformed WLT: X6.0 Isocenter diameter
+
+![Aktueller Qualiformed-WLT Verlauf](docs/current/qualiformed_wlt_history.png)
+
+## Open-Source Workflows
+
+Die Open-Source-Variante bietet zwei Workflows:
 
 1. **Standard WLT**
    - nutzt `pylinac.WinstonLutz`
@@ -15,7 +88,10 @@ Open-source Variante des WLT-Tools mit zwei Workflows:
    - kann optional ein RTPLAN-DICOM laden, um Bilder ueber Gantry/Kollimator/Tisch Beam-Namen zuzuordnen
    - schreibt CSV, JSON, Einzelbild-Previews, MLC-Muster aus dem RTPLAN und einen Uebersichtsgraphen
 
-Diese Open-Version enthaelt keine privaten Serverpfade, keine Userliste und keine zentralen CSV-Records. Die produktive MG-Variante bleibt davon getrennt.
+Die produktive Portable-App, zentrale Verlaufsdaten und klinischen Ausgaben sind
+nicht Bestandteil dieses Repositories. Die oben dokumentierten UKL-Pfade dienen
+als betriebliche Referenz; es werden keine DICOMs, Reports, CSV-Rohdaten oder
+patientenbezogenen Daten eingecheckt.
 
 ## Installation
 
