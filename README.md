@@ -113,6 +113,15 @@ Der Starter nutzt das globale Python 3.14 des PCs. Er legt keine `.venv` an.
 
 Die Screenshots zeigen anonymisierte Beispiel-Auswertungen. Pfade, Linac-Namen und lokale Userdaten sind bewusst durch Platzhalter ersetzt.
 
+> **Hinweis zum aktuellen GUI-Stand:** Die Abbildungen zeigen noch nicht die
+> beiden neuen Reiter **Translationsverlauf** und **Qualiformed**.
+> **Translationsverlauf** zeigt je Geraet und nach DICOM-Aufnahmedatum die
+> Abweichungen in `L-R`, `T-G`, `B-D` sowie den 3D-Translationsvektor.
+> **Qualiformed** bietet eine Geraete- und Metrikauswahl mit Grenzwert,
+> Metrikerlaeuterung, Zeitraum, Statistik und Link zur interaktiven
+> HTML-Auswertung. Die aktuellen Ergebnisplots dieser Reiter stehen oben im
+> Abschnitt **Aktuelle Verlaeufe und Ausgaben**.
+
 ### Standard WLT nach Auswertung
 
 ![Standard WLT nach Auswertung](docs/screenshots/standard_wlt_after.png)
