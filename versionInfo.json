@@ -1,0 +1,35 @@
+{
+  "version": "3.0",
+  "build": 3,
+  "lastUpdate": "2026-07-23",
+  "lastChange": "UKL-Verlaeufe, zentrale Outputs und Hub-Dokumentation aktualisiert",
+  "changelog": [
+    {
+      "build": 3,
+      "date": "2026-07-23",
+      "title": "UKL-Verlaeufe und Betriebsdokumentation aktualisiert",
+      "changes": [
+        "Translations- und Qualiformed-Verlaeufe sind mit aktuellen anonymisierten Snapshots dokumentiert.",
+        "Anleitung, Portable-App, Quellstand sowie zentrale Standard-WLT-, Multi-Ball- und Qualiformed-Ausgaben sind verlinkt.",
+        "PDF-, Pfad-, Ausgabe- und Verlaufsverbesserungen des aktuellen Arbeitsstands wurden im Git gesichert."
+      ]
+    },
+    {
+      "build": 2,
+      "date": "2026-06-19",
+      "title": "GUI-Pfade und Bedienung verbessert",
+      "changes": [
+        "Lange Pfade werden kompakter und mit erkennbarem Pfadende dargestellt.",
+        "Standard- und Multi-Ball-Bedienfelder wurden platzsparender angeordnet."
+      ]
+    },
+    {
+      "build": 1,
+      "date": "2026-06-08",
+      "title": "Winston-Lutz Analyzer veroeffentlicht",
+      "changes": [
+        "Standard-WLT- und Multi-Ball-Off-Iso-Workflows wurden als gemeinsamer Ausgangsstand bereitgestellt."
+      ]
+    }
+  ]
+}
