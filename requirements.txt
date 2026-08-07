@@ -1,4 +1,4 @@
-# Validated with Python 3.14.3 on 2026-06-08.
+# Validated with Python 3.13 on 2026-08-07.
 # pylinac 3.44.0 was the latest PyPI release at validation time.
 pylinac==3.44.0
 pydicom==2.4.5

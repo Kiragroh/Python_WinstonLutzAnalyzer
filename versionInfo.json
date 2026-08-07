@@ -1,17 +1,28 @@
 {
   "version": "3.0",
-  "build": 3,
-  "lastUpdate": "2026-07-23",
-  "lastChange": "UKL-Verlaeufe, zentrale Outputs und Hub-Dokumentation aktualisiert",
+  "build": 4,
+  "lastUpdate": "2026-08-07",
+  "lastChange": "Open-Source-Dokumentation und Standardpfade bereinigt",
   "changelog": [
+    {
+      "build": 4,
+      "date": "2026-08-07",
+      "title": "Oeffentliche Version bereinigt",
+      "changes": [
+        "Interne Betriebsverweise, Netzwerkpfade und Ergebnis-Snapshots wurden aus dem Repository entfernt.",
+        "Die Anwendung nutzt standardmaessig den lokalen Output-Ordner; ein gemeinsamer Pfad kann neutral ueber WLT_OUTPUT_ROOT gesetzt werden.",
+        "Report-Bezeichnungen und Bedienhinweise wurden institutionsunabhaengig formuliert.",
+        "Der Starter erkennt Python 3.13 oder neuer und bietet eine CheckOnly-Pruefung ohne GUI-Start."
+      ]
+    },
     {
       "build": 3,
       "date": "2026-07-23",
-      "title": "UKL-Verlaeufe und Betriebsdokumentation aktualisiert",
+      "title": "Dokumentation aktualisiert",
       "changes": [
-        "Translations- und Qualiformed-Verlaeufe sind mit aktuellen anonymisierten Snapshots dokumentiert.",
-        "Anleitung, Portable-App, Quellstand sowie zentrale Standard-WLT-, Multi-Ball- und Qualiformed-Ausgaben sind verlinkt.",
-        "PDF-, Pfad-, Ausgabe- und Verlaufsverbesserungen des aktuellen Arbeitsstands wurden im Git gesichert."
+        "Standard-WLT- und Multi-Ball-Funktionen wurden ausfuehrlicher dokumentiert.",
+        "Die Bedienoberflaeche wurde mit neutralen Beispielabbildungen ergaenzt.",
+        "PDF-, Pfad-, Ausgabe- und Verlaufsverbesserungen wurden dokumentiert."
       ]
     },
     {

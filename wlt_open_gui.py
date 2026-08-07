@@ -38,19 +38,19 @@ WORKSPACE_DIR = PROJECT_DIR.parent
 DEFAULT_MULTI_IMAGE_DIR = PROJECT_DIR / "examples" / "multi_ball" / "rtimages"
 DEFAULT_MULTI_PLAN = PROJECT_DIR / "examples" / "multi_ball" / "rtplan.dcm"
 DEFAULT_WLT_DIR = PROJECT_DIR / "examples" / "standard_wlt"
-PERSISTENT_OUTPUT_ROOT = Path(r"\\medizin.uni-leipzig.de\data\Archiv\STR\STR-Physik\11. Scripting\Output")
-PERSISTENT_WLT_DIR = PERSISTENT_OUTPUT_ROOT / "WLT"
-PERSISTENT_NORMAL_OUTPUT_DIR = PERSISTENT_WLT_DIR / "Normal"
-PERSISTENT_MULTI_OUTPUT_DIR = PERSISTENT_WLT_DIR / "Multi"
 LOCAL_OUTPUT_DIR = PROJECT_DIR / "output"
-OUTPUT_DIR = PERSISTENT_WLT_DIR if PERSISTENT_OUTPUT_ROOT.exists() or PERSISTENT_WLT_DIR.exists() else LOCAL_OUTPUT_DIR
+CONFIGURED_OUTPUT_ROOT_TEXT = os.environ.get("WLT_OUTPUT_ROOT", "").strip()
+CONFIGURED_OUTPUT_ROOT = Path(CONFIGURED_OUTPUT_ROOT_TEXT).expanduser() if CONFIGURED_OUTPUT_ROOT_TEXT else None
+CONFIGURED_WLT_DIR = CONFIGURED_OUTPUT_ROOT / "WLT" if CONFIGURED_OUTPUT_ROOT else None
+CONFIGURED_NORMAL_OUTPUT_DIR = CONFIGURED_WLT_DIR / "Normal" if CONFIGURED_WLT_DIR else None
+CONFIGURED_MULTI_OUTPUT_DIR = CONFIGURED_WLT_DIR / "Multi" if CONFIGURED_WLT_DIR else None
+OUTPUT_DIR = CONFIGURED_WLT_DIR if CONFIGURED_WLT_DIR else LOCAL_OUTPUT_DIR
 APP_ICON_PATH = PROJECT_DIR / "assets" / "wlt_icon.ico"
 HISTORY_CSV = OUTPUT_DIR / "wlt_history.csv"
 GUI_SETTINGS_JSON = OUTPUT_DIR / "gui_settings.json"
 EXACTRAC_NULLING_HELP = (
-    "ExacTrac mm / 10 zum Tischwert addieren, Vorzeichen beibehalten.\n"
-    "Initial:  VRT -10.44 | LNG 91.74 | LAT 0.62 cm\n"
-    "Korrektur: VRT -0.9 | LNG +0.2 | LAT +0.3 mm -> Final: -10.53 | 91.76 | 0.65 cm"
+    "Optionale Tischkorrektur: Translationswerte gemaess der lokalen\n"
+    "Koordinaten-, Vorzeichen- und Einheitenkonvention uebertragen."
 )
 HISTORY_COLUMNS = [
     "timestamp",
@@ -87,9 +87,9 @@ TABLE_ALT = "#111827"
 TABLE_HEAD = "#1e293b"
 TABLE_TEXT = "#e2e8f0"
 TABLE_SELECT = "#0d9488"
-HAMBURG_BLUE = "#003c5f"
-HAMBURG_CYAN = "#00a6c8"
-HAMBURG_RED = "#e30613"
+REPORT_BLUE = "#003c5f"
+REPORT_CYAN = "#00a6c8"
+REPORT_RED = "#e30613"
 
 
 def path_or_empty(path: Path) -> str:
@@ -134,11 +134,11 @@ def normalize_timestamp_value(value: object) -> str:
 
 
 def default_wlt_output_dir() -> Path:
-    return PERSISTENT_NORMAL_OUTPUT_DIR if PERSISTENT_OUTPUT_ROOT.exists() or PERSISTENT_NORMAL_OUTPUT_DIR.exists() else LOCAL_OUTPUT_DIR
+    return CONFIGURED_NORMAL_OUTPUT_DIR or LOCAL_OUTPUT_DIR
 
 
 def default_multi_output_dir() -> Path:
-    return PERSISTENT_MULTI_OUTPUT_DIR if PERSISTENT_OUTPUT_ROOT.exists() or PERSISTENT_MULTI_OUTPUT_DIR.exists() else LOCAL_OUTPUT_DIR
+    return CONFIGURED_MULTI_OUTPUT_DIR or LOCAL_OUTPUT_DIR
 
 
 def normalize_path_text(value: str | Path) -> str:
@@ -152,20 +152,18 @@ def is_legacy_output_path(value: object) -> bool:
     return (
         normalized == normalize_path_text(LOCAL_OUTPUT_DIR)
         or normalized.endswith("\\wlt_v3.0_open\\output")
-        or normalized.endswith("\\etd-wlt-ukl\\output")
-        or normalized.endswith("\\etd-wlt-ukl_portable\\output")
     )
 
 
-def is_persistent_output_path(value: object) -> bool:
-    if not isinstance(value, str) or not value.strip():
+def is_configured_output_path(value: object) -> bool:
+    if not CONFIGURED_OUTPUT_ROOT or not isinstance(value, str) or not value.strip():
         return False
     normalized = normalize_path_text(value)
     return normalized in {
-        normalize_path_text(PERSISTENT_OUTPUT_ROOT),
-        normalize_path_text(PERSISTENT_WLT_DIR),
-        normalize_path_text(PERSISTENT_NORMAL_OUTPUT_DIR),
-        normalize_path_text(PERSISTENT_MULTI_OUTPUT_DIR),
+        normalize_path_text(CONFIGURED_OUTPUT_ROOT),
+        normalize_path_text(CONFIGURED_WLT_DIR),
+        normalize_path_text(CONFIGURED_NORMAL_OUTPUT_DIR),
+        normalize_path_text(CONFIGURED_MULTI_OUTPUT_DIR),
     }
 
 
@@ -284,9 +282,9 @@ def migrate_gui_settings(settings: dict[str, object]) -> tuple[dict[str, object]
         section = settings.get(section_name)
         if not isinstance(section, dict):
             continue
-        if is_legacy_output_path(section.get("wlt_output")) or is_persistent_output_path(section.get("wlt_output")):
+        if is_legacy_output_path(section.get("wlt_output")) or is_configured_output_path(section.get("wlt_output")):
             set_if_different(section, "wlt_output", str(default_wlt_output_dir()))
-        if is_legacy_output_path(section.get("multi_output")) or is_persistent_output_path(section.get("multi_output")):
+        if is_legacy_output_path(section.get("multi_output")) or is_configured_output_path(section.get("multi_output")):
             set_if_different(section, "multi_output", str(default_multi_output_dir()))
     return settings, changed
 
@@ -351,7 +349,7 @@ def normalized_linac_number(value: object) -> str:
     return text or "Unbekannt"
 
 
-def uke_linac_label(wl: object, fallback: str) -> str:
+def report_linac_label(wl: object, fallback: str) -> str:
     images = list(getattr(wl, "images", []) or [])
     if images:
         station = metadata_value(images[0], "StationName", "") or metadata_value(images[0], "RadiationMachineName", "")
@@ -382,7 +380,7 @@ def first_image_by_gantry(images: list[object], preferred_angles: tuple[int, ...
     return None
 
 
-def select_uke_preview_images(wl: object) -> list[object]:
+def select_report_preview_images(wl: object) -> list[object]:
     images = list(getattr(wl, "images", []) or [])
     selected: list[object] = []
     for angles in ((0, 360), (180,), (90,), (270,)):
@@ -508,11 +506,11 @@ def create_wlt_cover_pdf(
 
     canvas.setFillColor(colors.white)
     canvas.rect(0, 0, width, height, stroke=0, fill=1)
-    canvas.setFillColor(colors.HexColor(HAMBURG_BLUE))
+    canvas.setFillColor(colors.HexColor(REPORT_BLUE))
     canvas.rect(0, height - 3.2 * cm, width, 3.2 * cm, stroke=0, fill=1)
-    canvas.setFillColor(colors.HexColor(HAMBURG_CYAN))
+    canvas.setFillColor(colors.HexColor(REPORT_CYAN))
     canvas.rect(0, height - 3.35 * cm, width * 0.72, 0.15 * cm, stroke=0, fill=1)
-    canvas.setFillColor(colors.HexColor(HAMBURG_RED))
+    canvas.setFillColor(colors.HexColor(REPORT_RED))
     canvas.rect(width * 0.72, height - 3.35 * cm, width * 0.28, 0.15 * cm, stroke=0, fill=1)
 
     canvas.setFillColor(colors.white)
@@ -537,9 +535,9 @@ def create_wlt_cover_pdf(
 
     card_y = height - 9.0 * cm
     card_w = 5.7 * cm
-    draw_metric_card(canvas, 1.4 * cm, card_y, card_w, "Max CAX -> BB", metric_text(data, "max_2d_cax_to_bb_mm"), HAMBURG_RED)
-    draw_metric_card(canvas, 7.55 * cm, card_y, card_w, "Median CAX -> BB", metric_text(data, "median_2d_cax_to_bb_mm"), HAMBURG_CYAN)
-    draw_metric_card(canvas, 13.7 * cm, card_y, card_w, "Gantry Iso Diameter", metric_text(data, "gantry_3d_iso_diameter_mm"), HAMBURG_BLUE)
+    draw_metric_card(canvas, 1.4 * cm, card_y, card_w, "Max CAX -> BB", metric_text(data, "max_2d_cax_to_bb_mm"), REPORT_RED)
+    draw_metric_card(canvas, 7.55 * cm, card_y, card_w, "Median CAX -> BB", metric_text(data, "median_2d_cax_to_bb_mm"), REPORT_CYAN)
+    draw_metric_card(canvas, 13.7 * cm, card_y, card_w, "Gantry Iso Diameter", metric_text(data, "gantry_3d_iso_diameter_mm"), REPORT_BLUE)
 
     rows = [
         ("Linac", linac),
@@ -640,7 +638,7 @@ def np_percentiles(values: object, percentiles: list[float]) -> tuple[float, flo
     return float(low), float(high)
 
 
-def create_uke_summary_pdf(
+def create_legacy_summary_pdf(
     summary_pdf: Path,
     wl: object,
     data: dict[str, object],
@@ -678,7 +676,7 @@ def create_uke_summary_pdf(
     avg_sid = statistics.mean([value for value in avg_sid_values if value is not None]) if any(value is not None for value in avg_sid_values) else 0.0
     study_date = dicom_date_text(metadata_value(first_image, "StudyDate")) if first_image else "n/a"
     study_time = dicom_time_text(metadata_value(first_image, "StudyTime")) if first_image else "n/a"
-    linac_label = uke_linac_label(wl, linac)
+    linac_label = report_linac_label(wl, linac)
     max_bb = safe_float(data.get("max_2d_cax_to_bb_mm"))
     median_bb = safe_float(data.get("median_2d_cax_to_bb_mm"))
     gantry_iso = safe_float(data.get("gantry_3d_iso_diameter_mm")) or 0.0
@@ -753,7 +751,7 @@ def create_uke_summary_pdf(
         draw_text_lines(canvas, value_lines, 13.6, 22.45, font_size=12, color="#0000ff")
 
     plot_locations = [(3, 10.8), (3, 1.8), (11.2, 10.8), (11.2, 1.8)]
-    for image, location in zip(select_uke_preview_images(wl), plot_locations):
+    for image, location in zip(select_report_preview_images(wl), plot_locations):
         plot_stream = io.BytesIO()
         try:
             with quiet_future_warnings():
@@ -777,7 +775,7 @@ def create_uke_summary_pdf(
 
     canvas.setFont("Helvetica", 7)
     canvas.setFillColor(colors.HexColor("#64748b"))
-    canvas.drawRightString(20 * cm, 0.9 * cm, f"UKE legacy summary ohne Signatur | {APP_TITLE} | {timestamp}")
+    canvas.drawRightString(20 * cm, 0.9 * cm, f"Legacy summary | {APP_TITLE} | {timestamp}")
     canvas.showPage()
     canvas.save()
 
@@ -955,9 +953,9 @@ class OpenWltApp(tk.Tk):
         keep = bool(self._settings_dict("keep_paths").get(key, False))
         value = pinned_paths.get(key, "") if keep else paths.get(key, "")
         if isinstance(value, str) and value.strip():
-            if key == "wlt_output" and (is_legacy_output_path(value) or is_persistent_output_path(value)):
+            if key == "wlt_output" and (is_legacy_output_path(value) or is_configured_output_path(value)):
                 return str(default_wlt_output_dir())
-            if key == "multi_output" and (is_legacy_output_path(value) or is_persistent_output_path(value)):
+            if key == "multi_output" and (is_legacy_output_path(value) or is_configured_output_path(value)):
                 return str(default_multi_output_dir())
             return value
         if key.endswith("output"):
@@ -1682,7 +1680,7 @@ class OpenWltApp(tk.Tk):
             if make_pdf:
                 pdf_file = output / f"wlt_report_{timestamp}.pdf"
                 cover_file = output / f"wlt_report_cover_{timestamp}.pdf"
-                uke_file = output / f"wlt_report_uke_{timestamp}.pdf"
+                summary_file = output / f"wlt_report_summary_{timestamp}.pdf"
                 pylinac_file = output / f"wlt_report_pylinac_{timestamp}.pdf"
                 with quiet_future_warnings():
                     wl.publish_pdf(
@@ -1694,23 +1692,23 @@ class OpenWltApp(tk.Tk):
                     raise RuntimeError(f"PDF wurde nicht geschrieben: {pylinac_file}")
                 try:
                     create_wlt_cover_pdf(cover_file, data, folder, output, linac, timestamp, notes)
-                    create_uke_summary_pdf(uke_file, wl, data, folder, linac, timestamp)
-                    if merge_pdfs([cover_file, uke_file, pylinac_file], pdf_file):
+                    create_legacy_summary_pdf(summary_file, wl, data, folder, linac, timestamp)
+                    if merge_pdfs([cover_file, summary_file, pylinac_file], pdf_file):
                         if not pdf_file.exists() or pdf_file.stat().st_size == 0:
                             raise RuntimeError(f"PDF wurde nicht geschrieben: {pdf_file}")
                         cover_file.unlink(missing_ok=True)
-                        uke_file.unlink(missing_ok=True)
+                        summary_file.unlink(missing_ok=True)
                         pylinac_file.unlink(missing_ok=True)
                         pdf_path = str(pdf_file)
-                        log(f"  PDF-Report: {pdf_file} (Deckblatt + UKE-Seite ohne Signatur + pylinac)\n")
+                        log(f"  PDF-Report: {pdf_file} (Deckblatt + Legacy-Summary + pylinac)\n")
                     else:
                         pdf_path = str(pylinac_file)
                         log(f"  PDF-Report: {pylinac_file} (pylinac)\n")
                         log(f"  PDF-Deckblatt separat: {cover_file} (pypdf/PyPDF2 nicht installiert)\n")
-                        log(f"  PDF-UKE-Seite separat: {uke_file} (pypdf/PyPDF2 nicht installiert)\n")
+                        log(f"  PDF-Summary separat: {summary_file} (pypdf/PyPDF2 nicht installiert)\n")
                 except Exception as pdf_style_exc:
                     pdf_path = str(pylinac_file)
-                    log(f"  PDF-Deckblatt/UKE-Seite konnte nicht erstellt/gemerged werden: {pdf_style_exc}\n")
+                    log(f"  PDF-Deckblatt/Summary konnte nicht erstellt/gemerged werden: {pdf_style_exc}\n")
                     log(f"  PDF-Report: {pylinac_file} (pylinac)\n")
             if write_history:
                 self._record_history(
