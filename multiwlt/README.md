@@ -75,7 +75,7 @@ The demo generates four labelled synthetic RTIMAGE files with an injected panel 
 
 ## Analyse acquired images
 
-The external, deidentified imaging dataset is not yet included. Its future URL belongs in [data/manifest.json](data/manifest.json). No acquired DICOM files, patient-labelled TPS screenshots or internal network paths are included here.
+The [initial acquired phantom dataset](https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/releases/tag/multiwlt-data-20260925-v1) is available as a GitHub Release ZIP (approximately 84 MB, 297 DICOM files). It includes 287 CT slices, the source R6 RTPLAN, associated RTSTRUCT, four MVHighQuality images, four delivery records and a matching analysis reference. See [download and reproduction instructions](data/README.md), [checksums](data/manifest.json) and the detailed README inside the archive. Pixel values, control points and contour coordinates were preserved; identifiers were replaced. The imported-plan return export remains unavailable, so use the records as described. The source tree retains only the small synthetic demo fixture.
 
 ```sh
 python analyse.py local_data/MV --profile local_data/reference.json --records local_data/Positioning --positioned-in-ct --output results

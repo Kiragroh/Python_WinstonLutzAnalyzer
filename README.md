@@ -30,7 +30,7 @@ python demo.py --output demo_output
 python -m pytest tests -q
 ```
 
-The demo uses labelled synthetic images and an incomplete synthetic geometry fixture, **not a deliverable treatment plan**. The deidentified acquired-image download is still pending; its link will be added to [`data/manifest.json`](multiwlt/data/manifest.json). No acquired DICOM datasets or institution-specific deployment configuration are committed.
+The demo uses labelled synthetic images and an incomplete synthetic geometry fixture, **not a deliverable treatment plan**. The [acquired phantom dataset](https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/releases/tag/multiwlt-data-20260925-v1) is now available as a GitHub Release (approximately 84 MB): CT, source RTPLAN, RTSTRUCT, four MV images and four delivery records. Download checksums and file counts are in [`data/manifest.json`](multiwlt/data/manifest.json). Large DICOM files are stored as release assets; institution-specific deployment configuration is not included.
 
 ## Acknowledgements
 

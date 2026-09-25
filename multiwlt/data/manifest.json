@@ -1,11 +1,24 @@
 {
-  "status": "awaiting_public_download_link",
-  "download_url": null,
-  "expected_contents": [
-    "deidentified CT reference",
-    "matching RTPLAN and analysis profile",
-    "four MV RTIMAGEs",
-    "matching delivery records where needed"
-  ],
-  "included_acquired_dicom_count": 0
+  "status": "available",
+  "release_url": "https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/releases/tag/multiwlt-data-20260925-v1",
+  "download_url": "https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/releases/download/multiwlt-data-20260925-v1/MultiWLT_Leipzig_Initial_20260925_v1.zip",
+  "checksum_url": "https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/releases/download/multiwlt-data-20260925-v1/MultiWLT_Leipzig_Initial_20260925_v1.zip.sha256",
+  "sha256": "3e447eb2a1094ff8f81ccfb087b2e94b36ff3a2ac8b49e75dd6b3294fae16671",
+  "archive_bytes": 83935311,
+  "archive_root": "MultiWLT_Leipzig_Initial_20260925",
+  "dicom_counts": {
+    "CT": 287,
+    "RTPLAN": 1,
+    "RTSTRUCT": 1,
+    "RTIMAGE": 4,
+    "RTRECORD": 4
+  },
+  "included_acquired_dicom_count": 297,
+  "licence": "MIT (included in archive)",
+  "validated_code_commit": "89f69693735dc0ebd185e8313fa61697d2451f27",
+  "reference_profile": "RT/reference.json",
+  "records_required": true,
+  "imported_plan_return_export_included": false,
+  "source_plan_included": true,
+  "note": "Phantom data. The source-plan and imported-plan identities remain distinct; use matching records. Raw files are release assets rather than Git source files."
 }
