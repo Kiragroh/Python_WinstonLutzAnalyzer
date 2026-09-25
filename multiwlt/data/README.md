@@ -16,6 +16,16 @@ Extract the required ZIPs into the **same parent directory**, e.g. `multiwlt/loc
 
 The [original full ZIP](https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/releases/download/multiwlt-data-20260925-v1/MultiWLT_Leipzig_Initial_20260925_v1.zip) remains available for existing links. [Release notes](https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/releases/tag/multiwlt-data-20260925-v1) · [Full manifest](manifest.json).
 
+## All five RTPLANs
+
+[Download all five de-identified plans (39 kB)](https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/releases/download/multiwlt-data-20260925-v1/MultiWLT_All_RTPLANs_v1.zip) · [SHA-256](https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/releases/download/multiwlt-data-20260925-v1/MultiWLT_All_RTPLANs_v1.zip.sha256)
+
+Includes **traditional Standard-WLT**, **MultiWLT R6**, **BB01-ISO**, **DCA D2** and **G0 couch/collimator variation**. Machine/tolerance labels are `RESEARCH_TB`; patient is `PHANTOM^MULTIWLT` / `MULTIWLT_PHANTOM`. All plans remain UNAPPROVED. The R6 plan is byte-identical to the initial data release. The other plans are preparation/outlook, not additional measured results.
+
+The G0 alpha plan has 12 static fields: four couch angles, three collimators each. The planned openings and profile are verified; device import, collision clearance and acquired-image analysis are pending. It cannot determine a 3D sphere per couch from one gantry direction.
+
+**Standard-WLT anatomy exception:** the traditional plan retains a separate, remapped original CT/RTSTRUCT reference; those objects are not included. It must not be associated with the Brainlab CT by simply changing a UID. Plans R6, BB01, DCA and G0 use the stable Brainlab anatomy package. See the archive README and per-plan catalog before local adaptation/import.
+
 ## Reproduce
 
 Extract below `multiwlt/local_data`, retaining the archive folder name. From `multiwlt`, run:

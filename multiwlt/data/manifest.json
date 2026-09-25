@@ -52,6 +52,15 @@
       "anatomy_id": "leipzig-brainlab-ct-v1",
       "note": "Four initial MV images, four matching delivery records, example results and original validation. Bound to the initial R6 geometry, not arbitrary future plans. Use --records for the imported/source-plan identity distinction.",
       "dicom_files": 8
+    },
+    "all_plans": {
+      "version": "1",
+      "download_url": "https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/releases/download/multiwlt-data-20260925-v1/MultiWLT_All_RTPLANs_v1.zip",
+      "checksum_url": "https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/releases/download/multiwlt-data-20260925-v1/MultiWLT_All_RTPLANs_v1.zip.sha256",
+      "sha256": "fea6ef31f20770c81d4d9449cba07af4aa235c0230f73480c988701dac63e0af",
+      "archive_bytes": 39144,
+      "dicom_files": 5,
+      "note": "Five de-identified plans: Standard, R6, BB01 ISO, DCA D2, G0 couch/collimator alpha. Standard has a separate original CT/RS that is not included. All other plans use anatomy v1. Only R6 has initial measured results."
     }
   },
   "legacy_full_bundle": "Retained unchanged for existing links. Prefer the components for new downloads.",
