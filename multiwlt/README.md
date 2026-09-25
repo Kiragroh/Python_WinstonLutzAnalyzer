@@ -33,7 +33,7 @@ Three balls lie approximately 48.7, 59.9 and 75.2 mm from the planned isocentre.
 
 All twelve pairs were detected. The largest extra 2D displacement is **0.508 mm**. BB03 at gantry 285° needs field-centre method review: area centroid and opposing-edge centre differ by 0.697 mm. These are initial measurements without an established uncertainty budget or a clinical pass/fail decision. The source R6 plan geometry is corroborated by delivery records (maximum leaf discrepancy 0.03 mm, consistent with rounding); the imported-plan RTPLAN return export is still pending. Delivery records do not redefine the expected opening.
 
-For example, BB01 at gantry 195° has an expected offset of approximately 1.095 mm, but only **0.224 mm extra displacement**. The large raw offset is predominantly planned. Full component values are in [initial_results.csv](examples/initial_results.csv). The [English example report](examples/initial_report_en.pdf) shows the overview and all four acquired views.
+For example, BB01 at gantry 195° has an expected offset of approximately 1.091 mm at the recorded beam angles, but only **0.224 mm extra displacement**. The large raw offset is predominantly planned. Full component values are in [initial_results.csv](examples/initial_results.csv). The [English example report](examples/initial_report_en.pdf) shows the overview and all four acquired views.
 
 ## Local 3D ray envelopes
 
