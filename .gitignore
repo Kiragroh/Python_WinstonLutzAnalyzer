@@ -4,5 +4,7 @@ __pycache__/
 dist/
 build/
 *.spec
+!multiwlt/portable.spec
+portable_build.log
 output/*
 !output/.gitkeep

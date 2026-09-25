@@ -1,6 +1,8 @@
 # Winston-Lutz Analyzer – bisherige Desktop-GUI
 
-Die neue CT-referenzierte Auswertung steht separat unter [multiwlt/](multiwlt/README.md). Der hier beschriebene Multi-Ball-Reiter zieht deren CT-/Plan-Sollversatz noch nicht ab. Im neuen Unterordner liegt ausschließlich eine synthetische DICOM-Geometrie zum Softwaretest.
+Die neue CT-referenzierte Auswertung hat eine eigene [portable Windows-GUI](https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/releases/tag/multiwlt-gui-v0.2.0): ZIP vollständig entpacken, `MultiWLT.exe` starten, MV-Ordner, passendes Referenzprofil, gegebenenfalls RTRECORD-Ordner und Ausgabeordner auswählen. Die GUI erzeugt PDF, CSV und JSON mit abgezogenem CT-/Plan-Sollversatz. [Anleitung und vier Beispielaufnahmen](multiwlt/PORTABLE.md).
+
+Der nachfolgend beschriebene ältere Multi-Ball-Reiter zieht diesen Sollversatz noch nicht ab. Für MultiWLT daher die neue separate GUI verwenden. Die anonymisierten Messdaten liegen als [GitHub-Downloads](multiwlt/data/README.md) vor; im Quellbaum liegt nur die synthetische Geometrie zum Softwaretest.
 
 Desktop-Anwendung fuer die Auswertung von Winston-Lutz-Aufnahmen mit Python und
 [`pylinac`](https://pylinac.readthedocs.io/). Das Repository enthaelt eine

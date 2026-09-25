@@ -2,6 +2,8 @@
 
 Python tools for standard Winston–Lutz analysis and CT-referenced, off-isocentre MultiWLT. The desktop application uses [pylinac](https://pylinac.readthedocs.io/); the new [`multiwlt/`](multiwlt/) research module explicitly subtracts the expected CT/plan offset before evaluating measured deviations.
 
+**Windows without Python:** [download the portable MultiWLT GUI](https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/releases/tag/multiwlt-gui-v0.2.0). Extract the complete ZIP, start `MultiWLT.exe`, select MV images, matching reference and delivery records, then create the PDF/CSV/JSON report. [Quick start and initial-data reproduction](multiwlt/PORTABLE.md). This dedicated GUI uses the CT-corrected method; the older general application's Multi-Ball tab remains the legacy raw-distance method.
+
 ## Choose a workflow
 
 | Workflow | Entry point | What it reports |

@@ -2,6 +2,8 @@
 
 Research prototype for a static, three-target, off-isocentre Winston–Lutz test with a Brainlab head phantom and a TrueBeam HD120 MLC. Four MV images provide twelve target–aperture measurements. This repository presents the **initial Leipzig test from 25 September 2026, performed by Dr. Sebastian Schäfer**, not a commissioned clinical protocol.
 
+**Desktop GUI:** [portable Windows download](https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/releases/tag/multiwlt-gui-v0.2.0) · [step-by-step instructions](PORTABLE.md). No Python installation is needed for the portable ZIP. From source, install the requirements and run `python gui.py`. Both GUI and CLI use the same CT-referenced evaluator and generate the same English PDF, CSV and JSON results.
+
 ![The Brainlab multi-target head phantom used for this project](assets/phantom.png)
 
 ## What is measured?
