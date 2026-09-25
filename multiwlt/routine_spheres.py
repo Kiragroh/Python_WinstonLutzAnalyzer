@@ -49,10 +49,10 @@ def envelope(origins,directions):
         fit=minimize(lambda z:z[-1],np.r_[start,max(distances(start))+1e-6],method='SLSQP',
             bounds=[(None,None),(None,None),(0,None)],constraints=[{'type':'ineq','fun':lambda z:z[-1]-distances(z[:2])}],
             options={'ftol':1e-11,'maxiter':1000})
-        if not fit.success or np.max(distances(fit.x[:2]))>fit.x[-1]+1e-6:raise ValueError('2D-Hüllkreis nicht konvergiert.')
+        if not fit.success or np.max(distances(fit.x[:2]))>fit.x[-1]+1e-6:raise ValueError('2D envelope circle did not converge.')
         return {'status':'plane_only','sample_count':len(origins),'diameter_mm':float(2*max(distances(fit.x[:2]))),
             'observable_center_lps_mm':(fit.x[:2]@basis).tolist(),'plane_basis_lps':basis.tolist(),
-            'condition':condition,'note':'Tiefe nicht bestimmbar: 2D-Hüllkreis, keine 3D-Kugel.'}
+            'condition':condition,'note':'Depth is not observable: 2D envelope circle, not a 3D sphere.'}
     start=np.linalg.solve(normal,np.einsum('nij,nj->i',projectors,origins))
     distances=lambda x:np.linalg.norm(np.einsum('nij,nj->ni',projectors,x-origins),axis=1)
     radius=max(distances(start))
@@ -61,7 +61,7 @@ def envelope(origins,directions):
         fit=minimize(lambda z:z[-1],np.r_[start,radius+1e-6],method='SLSQP',
             bounds=[(None,None)]*3+[(0,None)],constraints=[{'type':'ineq','fun':lambda z:z[-1]-distances(z[:3])}],
             options={'ftol':1e-11,'maxiter':1000})
-        if not fit.success or np.max(distances(fit.x[:3]))>fit.x[-1]+1e-6:raise ValueError('3D-Hüllkugel nicht konvergiert.')
+        if not fit.success or np.max(distances(fit.x[:3]))>fit.x[-1]+1e-6:raise ValueError('3D envelope sphere did not converge.')
         centre=fit.x[:3]
     distance=distances(centre)
     return {'status':'sphere_3d','sample_count':len(origins),'center_lps_mm':centre.tolist(),
@@ -87,20 +87,20 @@ def analyse_spheres(result,reference,beams):
     pooled=envelope(all_o,all_d)
     centres=[b['center_lps_mm'] for b in by_ball if b['status']=='sphere_3d']
     mean=np.mean(centres,axis=0).tolist() if len(centres)==len(by_ball) else None
-    return {'definition':'Kleinste Kugel, die alle korrigierten Strahlgeraden berührt/schneidet; CT-Kugelmitte je Met als lokaler Ursprung.',
-        'sign_convention':'Strahlungsreferenz relativ zur Kugel: korrigierte Feldprojektion = CT-Kugelprojektion minus (Ist-Soll). LPS: +L links, +P posterior, +S superior.',
-        'coverage':'Nur die aufgenommenen Winkel. Kein Nachweis über eine vollständige Rotation; keine reine Gantry- oder Kollimatorgröße bei gemischten Achsen.',
-        'primary_metric':'Maximaler zusätzlicher 2D-Versatz vor jeder 3D-Anpassung.',
+    return {'definition':'Smallest sphere intersecting every corrected ray; each target uses its CT ball centre as the local origin.',
+        'sign_convention':'Radiation reference relative to the ball: corrected field projection = CT ball projection minus (observed-expected). LPS: +L left, +P posterior, +S superior.',
+        'coverage':'Sampled angles only. No full-rotation claim; mixed-axis acquisitions do not isolate gantry or collimator performance.',
+        'primary_metric':'Maximum extra 2D displacement before any 3D fit.',
         'reference':'https://pylinac.readthedocs.io/en/latest/winston_lutz.html',
         'per_ball':by_ball,'pooled_all_rays':pooled,'mean_centres_lps_mm':mean,
         'mean_diameter_mm':float(np.mean([b['diameter_mm'] for b in by_ball])) if all('diameter_mm' in b for b in by_ball) else None,
-        'averaging_note':'Mittelwert der drei Mitten und Durchmesser rein beschreibend. Gemeinsame Hüllkugel nutzt alle Strahlen, ohne gegensinnige Fehler vorab wegzumitteln.'}
+        'averaging_note':'Mean centres and diameters are descriptive only. The pooled sphere uses all rays without first averaging out opposing errors.'}
 
 
 def plot_spheres(summary,path):
     import matplotlib.pyplot as plt
     fig=plt.figure(figsize=(9,6));ax=fig.add_subplot(111,projection='3d')
-    colors=['#008ac9','#008377','#b145a4','#243357'];data=[*summary['per_ball'],dict(summary['pooled_all_rays'],id='Gemeinsam')]
+    colors=['#008ac9','#008377','#b145a4','#243357'];data=[*summary['per_ball'],dict(summary['pooled_all_rays'],id='Pooled')]
     u,v=np.meshgrid(np.linspace(0,2*np.pi,40),np.linspace(0,np.pi,22));limits=[.5]
     for color,item in zip(colors,data):
         if item['status']!='sphere_3d':continue
@@ -108,9 +108,9 @@ def plot_spheres(summary,path):
         ax.plot_surface(x+r*np.cos(u)*np.sin(v),y+r*np.sin(u)*np.sin(v),z+r*np.cos(v),color=color,alpha=.14,linewidth=0)
         ax.scatter(x,y,z,color=color,s=50,label=f'{item["id"]}: Ø {item["diameter_mm"]:.3f} mm')
         ax.quiver(0,0,0,x,y,z,color=color,linewidth=1.5,arrow_length_ratio=.15)
-    lim=max(limits)*1.15;ax.scatter(0,0,0,color='#bd3443',marker='+',s=100,label='CT-Kugelmitte (0, 0, 0)')
-    if summary['mean_centres_lps_mm'] is not None:ax.scatter(*summary['mean_centres_lps_mm'],color='#333333',marker='D',s=40,label='Mittel der drei Mitten')
+    lim=max(limits)*1.15;ax.scatter(0,0,0,color='#bd3443',marker='+',s=100,label='CT ball centre (0, 0, 0)')
+    if summary['mean_centres_lps_mm'] is not None:ax.scatter(*summary['mean_centres_lps_mm'],color='#333333',marker='D',s=40,label='Mean of three centres')
     ax.set(xlim=(-lim,lim),ylim=(-lim,lim),zlim=(-lim,lim),xlabel='L / mm',ylabel='P / mm',zlabel='S / mm');ax.set_box_aspect((1,1,1))
     ax.view_init(elev=23,azim=135);ax.legend(loc='upper left',bbox_to_anchor=(-.28,1.02),fontsize=9)
-    fig.suptitle('Lokale Isozentrumskugeln aus den korrigierten Strahlgeraden\nBereits sollkorrigiert · Pfeile: verbleibender 3D-Restversatz',fontsize=11,color='#243357')
+    fig.suptitle('Local isocentre spheres from corrected rays\nExpected offsets already removed · Arrows: remaining 3D displacement',fontsize=11,color='#243357')
     fig.tight_layout();fig.savefig(path,dpi=160);plt.close(fig)

@@ -9,3 +9,5 @@ The extension was tested locally with Python 3.13 on 25 September 2026.
 - The locally used standalone implementation had 63 regression tests passing and one optional test skipped before this public add-on; those full local tests/data are not claimed to be bundled here.
 
 Acquired results and the remaining field-centre method review are described in the README. Repeatability, acquisition-mode comparisons and a clinical uncertainty budget remain open. No clinical pass/fail threshold is supplied. CI runs the bundled package tests and synthetic demo only.
+
+English publication check: report/plot labels and diagnostic messages were translated without changing the analysis expressions. All twelve acquired residual vectors and the pooled sphere match the previous implementation exactly. The six-page English example report was checked for layout and identifying text.

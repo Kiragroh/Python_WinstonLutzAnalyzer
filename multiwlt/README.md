@@ -18,7 +18,7 @@ CT ball centres come from the imaged dense spheres, not GTV centroids. Field cen
 
 ![Acquired MV crops and magnified expected-versus-observed centres, gantry 195 degrees](assets/expected_vs_observed.png)
 
-Cyan cross: measured field centre. Green square: expected ball centre relative to that field. Red circle: measured ball centre. The arrow from green to red is the extra displacement. Plot labels and the generated PDF are currently German; the interface and methodological description here are English.
+Cyan cross: measured field centre. Green square: expected ball centre relative to that field. Red circle: measured ball centre. The arrow from green to red is the extra displacement. The public module provides English plot labels, HTML/PDF reports, CSV headings and diagnostic messages.
 
 ## Initial measured results
 
@@ -33,7 +33,7 @@ Three balls lie approximately 48.7, 59.9 and 75.2 mm from the planned isocentre.
 
 All twelve pairs were detected. The largest extra 2D displacement is **0.508 mm**. BB03 at gantry 285° needs field-centre method review: area centroid and opposing-edge centre differ by 0.697 mm. These are initial measurements without an established uncertainty budget or a clinical pass/fail decision. The source R6 plan geometry is corroborated by delivery records (maximum leaf discrepancy 0.03 mm, consistent with rounding); the imported-plan RTPLAN return export is still pending. Delivery records do not redefine the expected opening.
 
-For example, BB01 at gantry 195° has an expected offset of approximately 1.095 mm, but only **0.224 mm extra displacement**. The large raw offset is predominantly planned. Full component values are in [initial_results.csv](examples/initial_results.csv).
+For example, BB01 at gantry 195° has an expected offset of approximately 1.095 mm, but only **0.224 mm extra displacement**. The large raw offset is predominantly planned. Full component values are in [initial_results.csv](examples/initial_results.csv). The [English example report](examples/initial_report_en.pdf) shows the overview and all four acquired views.
 
 ## Local 3D ray envelopes
 
@@ -137,6 +137,14 @@ Only the initial four-view results above have been measured. Proposed Leipzig ex
 - DCA with cine acquisition and angle-resolved expected and measured vectors. Dynamic analysis and delivery are not implemented in this static package.
 
 Other institutions can explore these extensions after validating their own geometry and workflow. No future-series measurements or ready-to-deliver arc/couch plans are claimed here.
+
+## Acknowledgements and related work
+
+We warmly thank **Paul Rétif** for sharing his ideas, his earlier ImageJ script and practical experience with off-axis Winston–Lutz testing. His work and the paper below were an important starting point for this project.
+
+Rétif P, Djibo Sidikou A, Waltener A, et al. **Integrating cine EPID, dynamic delivery, and the off-axis Winston-Lutz test to enhance quality control in multiple brain metastasis stereotactic radiotherapy.** *Physica Medica*. 2024;120:103343. [doi:10.1016/j.ejmp.2024.103343](https://doi.org/10.1016/j.ejmp.2024.103343).
+
+The present implementation explores a static four-image workflow with CT-visible ball centres and expected offsets calculated directly from CT/RTPLAN geometry. It is inspired by this prior work; it is not a reproduction or validation of the published dynamic cine method. Paul’s ImageJ script and paper are not redistributed in this repository.
 
 ## Method, reuse and contribution
 

@@ -18,7 +18,7 @@ Python tools for standard Winston–Lutz analysis and CT-referenced, off-isocent
 
 Four acquired MVHighQuality images, three balls, twelve ball–field pairs. The initial test was performed on **25 September 2026 by Dr. Sebastian Schäfer** in Leipzig. The largest additional 2D displacement was **0.508 mm**; one field-centre method comparison remains flagged for review. These are initial research results, not clinical acceptance criteria.
 
-**Start with the [English MultiWLT guide](multiwlt/README.md).** It includes the measured results, expected-versus-observed plots, a synthetic demo, a machine-name adapter and a tool for inspecting your own CT and plan.
+**Start with the [English MultiWLT guide](multiwlt/README.md).** The public MultiWLT module also generates English figures and reports. It includes the measured results, expected-versus-observed plots, a synthetic demo, a machine-name adapter and a tool for inspecting your own CT and plan.
 
 **Expected offsets are specific to the CT ball centres, plan isocentre, angles and apertures.** Do not reuse our offsets for a different CT/plan combination. Even with the same phantom model, verify your own ball layout and derive your own reference. [`inspect_phantom.py`](multiwlt/inspect_phantom.py) performs that check; unsupported ball arrangements, openings or image geometry require adapting and validating the logic.
 
@@ -31,6 +31,10 @@ python -m pytest tests -q
 ```
 
 The demo uses labelled synthetic images and an incomplete synthetic geometry fixture, **not a deliverable treatment plan**. The deidentified acquired-image download is still pending; its link will be added to [`data/manifest.json`](multiwlt/data/manifest.json). No acquired DICOM datasets or institution-specific deployment configuration are committed.
+
+## Acknowledgements
+
+We warmly thank **Paul Rétif** for his ideas, his earlier ImageJ script and his [2024 paper on cine EPID and off-axis Winston–Lutz testing](https://doi.org/10.1016/j.ejmp.2024.103343), which helped inspire this project. See the [full acknowledgement and methodological distinction](multiwlt/README.md#acknowledgements-and-related-work).
 
 ## Existing desktop application
 

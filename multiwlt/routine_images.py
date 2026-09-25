@@ -19,7 +19,7 @@ def image_provenance(ds):
     raw=getattr(ds,'ImageType',[])
     image_type=[str(v).strip().upper() for v in raw] if not isinstance(raw,str) else raw.upper().split('\\')
     if len(image_type)<3 or image_type[2]!='PORTAL' or image_type[0] not in ('ORIGINAL','DERIVED'):
-        raise ValueError('Nur RTIMAGEs mit eindeutigem PORTAL-Bildtyp werden unterstützt; DRR/Fluenzbilder sind keine Gerätemessung.')
+        raise ValueError('Only RTIMAGEs with explicit PORTAL image type are supported; DRR/fluence images are not machine measurements.')
     synthetic=('SYNTHETIC' in image_type[3:] or
                any('SYNTHETIC' in str(getattr(ds,key,'')).upper() for key in ['RTImageDescription','DerivationDescription']))
     derived=image_type[0]=='DERIVED'
@@ -30,27 +30,27 @@ def image_provenance(ds):
 def image_geometry(ds,expected_sad,*,positioned_in_ct=False):
     provenance=image_provenance(ds)
     required=['RTImageSID','RadiationMachineSAD','ImagePlanePixelSpacing','RTImagePosition','RTImageOrientation','RTImagePlane','XRayImageReceptorAngle']
-    if any(not hasattr(ds,key) or getattr(ds,key) is None for key in required):raise ValueError('RTIMAGE-Geometrie unvollständig (SID/SAD/Pixelmaß/Orientierung/Position).')
-    if str(getattr(ds,'Modality',''))!='RTIMAGE' or str(ds.RTImagePlane)!='NORMAL' or int(getattr(ds,'NumberOfFrames',1))!=1:raise ValueError('Nur einzelne normale RTIMAGE-Projektionen werden unterstützt.')
+    if any(not hasattr(ds,key) or getattr(ds,key) is None for key in required):raise ValueError('Incomplete RTIMAGE geometry (SID/SAD/pixel spacing/orientation/position).')
+    if str(getattr(ds,'Modality',''))!='RTIMAGE' or str(ds.RTImagePlane)!='NORMAL' or int(getattr(ds,'NumberOfFrames',1))!=1:raise ValueError('Only single normal RTIMAGE projections are supported.')
     sid,sad=finite([ds.RTImageSID,ds.RadiationMachineSAD]);spacing=finite(ds.ImagePlanePixelSpacing,2)
-    if sid<=0 or sad<=0 or np.any(spacing<=0) or abs(sad-expected_sad)>.5:raise ValueError('Ungültige oder zum Plan unpassende SAD/SID-/Pixelgeometrie.')
+    if sid<=0 or sad<=0 or np.any(spacing<=0) or abs(sad-expected_sad)>.5:raise ValueError('SAD/SID/pixel geometry is invalid or inconsistent with the plan.')
     receptor_angle=finite([ds.XRayImageReceptorAngle],1)[0]
-    if angle_delta(receptor_angle,0)>.001:raise ValueError('Gedrehter Bildempfänger derzeit nicht unterstützt.')
+    if angle_delta(receptor_angle,0)>.001:raise ValueError('Rotated image receptors are not currently supported.')
     translation_present=hasattr(ds,'XRayImageReceptorTranslation')
     translation=finite(ds.XRayImageReceptorTranslation,3) if translation_present else np.array([0.,0.,sad-sid])
-    if abs(translation[2]-(sad-sid))>.5:raise ValueError('Bildempfänger-Translation entlang der Strahlachse passt nicht zu SAD/SID.')
+    if abs(translation[2]-(sad-sid))>.5:raise ValueError('Image receptor translation along the beam axis is inconsistent with SAD/SID.')
     for owner in [ds,*getattr(ds,'ExposureSequence',[])]:
         for key in ['TableTopPitchAngle','TableTopRollAngle','TableTopEccentricAngle','GantryPitchAngle']:
             # Physical couch encoder corrections are not residual CT-pose angles.
             # This exception is explicit and limited to a confirmed CT-positioned workflow.
             if positioned_in_ct and key in ('TableTopPitchAngle','TableTopRollAngle'):continue
             if hasattr(owner,key) and angle_delta(finite([getattr(owner,key)],1)[0],0)>.001:
-                raise ValueError(f'Nicht-null {key} derzeit nicht unterstützt.')
+                raise ValueError(f'Nonzero {key} is not currently supported.')
     orientation=finite(ds.RTImageOrientation,6)
-    if abs(orientation[2])+abs(orientation[5])>1e-6:raise ValueError('Bildorientierung liegt nicht in der Detektorebene.')
+    if abs(orientation[2])+abs(orientation[5])>1e-6:raise ValueError('Image orientation is outside the detector plane.')
     matrix=np.column_stack([orientation[3:5]*spacing[0],orientation[:2]*spacing[1]])*(sad/sid)
     directions=np.column_stack([orientation[3:5],orientation[:2]])
-    if not np.allclose(directions.T@directions,np.eye(2),atol=1e-6):raise ValueError('Nicht-orthogonale Bildorientierung.')
+    if not np.allclose(directions.T@directions,np.eye(2),atol=1e-6):raise ValueError('Non-orthogonal image orientation.')
     # For NORMAL images at receptor angle zero, both x/y frames have the same axes.
     origin=(finite(ds.RTImagePosition,2)+translation[:2])*(sad/sid)
     return {'matrix':matrix,'origin':origin,'sid_mm':float(sid),'sad_mm':float(sad),
@@ -73,20 +73,20 @@ def match_beam(ds,beams,plan_sop_hash):
     refs=getattr(ds,'ReferencedRTPlanSequence',[])
     if plan_sop_hash is not None:
         if not refs or len(refs)!=1 or not str(getattr(refs[0],'ReferencedSOPInstanceUID','')).strip():
-            raise ValueError('Routineauswertung benötigt genau eine vollständige RTPLAN-Referenz im Bild.')
+            raise ValueError('Routine analysis requires exactly one complete RTPLAN reference in the image.')
         actual=hashlib.sha256(str(refs[0].ReferencedSOPInstanceUID).encode()).hexdigest()
-        if actual!=plan_sop_hash:raise ValueError('Bild referenziert einen anderen RTPLAN als das Referenzprofil.')
+        if actual!=plan_sop_hash:raise ValueError('Image references a different RTPLAN from the reference profile.')
         if getattr(ds,'ReferencedBeamNumber',None) is None:
-            raise ValueError('Routineauswertung benötigt die ReferencedBeamNumber im Bild.')
+            raise ValueError('Routine analysis requires ReferencedBeamNumber in the image.')
     keys=['GantryAngle','BeamLimitingDeviceAngle','PatientSupportAngle']
-    if any(not hasattr(ds,k) for k in keys):raise ValueError('Bildwinkel fehlen.')
+    if any(not hasattr(ds,k) for k in keys):raise ValueError('Image angles are missing.')
     angles=finite([getattr(ds,k) for k in keys],3)
     candidates=[b for b in beams if all(angle_delta(v,b[k])<=1.0 for v,k in zip(angles,['gantry_deg','collimator_deg','couch_deg']))]
     if hasattr(ds,'ReferencedBeamNumber'):
         try:beam_number=int(ds.ReferencedBeamNumber)
-        except (TypeError,ValueError,OverflowError) as exc:raise ValueError('Ungültige ReferencedBeamNumber im Bild.') from exc
+        except (TypeError,ValueError,OverflowError) as exc:raise ValueError('Invalid ReferencedBeamNumber in the image.') from exc
         candidates=[b for b in candidates if b['number']==beam_number]
-    if len(candidates)!=1:raise ValueError('Bild-/Feldzuordnung ist nicht eindeutig oder die Winkel passen nicht.')
+    if len(candidates)!=1:raise ValueError('Image-to-field assignment is ambiguous or angles do not match.')
     return candidates[0],('plan_reference' if plan_sop_hash is not None else 'angles_only')
 
 
@@ -94,13 +94,13 @@ def _crossing(axis,profile,expected,rising,half):
     outside=np.abs(axis)>half+3
     inside=np.abs(axis)<max(half-2,half*.6)
     low=float(np.median(profile[outside]));high=float(np.percentile(profile[inside],85))
-    if high-low<=0:raise ValueError('Feldkante ohne ausreichenden Kontrast.')
+    if high-low<=0:raise ValueError('Field edge has insufficient contrast.')
     level=(high+low)/2
     values=profile-level
     indices=np.where((values[:-1]<=0)&(values[1:]>0) if rising else (values[:-1]>=0)&(values[1:]<0))[0]
     locations=[float(axis[i]+(axis[i+1]-axis[i])*(-values[i])/(values[i+1]-values[i])) for i in indices]
     locations=[v for v in locations if abs(v-expected)<4]
-    if not locations:raise ValueError('Erwartete Feldkante nicht gefunden.')
+    if not locations:raise ValueError('Expected field edge not found.')
     return min(locations,key=lambda v:abs(v-expected))
 
 
@@ -116,9 +116,9 @@ def _field_edges(patch,xaxis,yaxis,width,height):
         try:
             bottom.append(_crossing(yaxis,profile,-height/2,True,height/2));top.append(_crossing(yaxis,profile,height/2,False,height/2))
         except ValueError:continue
-    if min(map(len,[left,right,bottom,top]))<5:raise ValueError('Zu wenige stabile Feldkantenprofile.')
+    if min(map(len,[left,right,bottom,top]))<5:raise ValueError('Too few stable field-edge profiles.')
     scatter=max(float(np.percentile(v,90)-np.percentile(v,10)) for v in [left,right,bottom,top])
-    if scatter>.65:raise ValueError('Feldkanten passen nicht zuverlässig zu einem Rechteck.')
+    if scatter>.65:raise ValueError('Field edges do not reliably match a rectangle.')
     l,r,b,t=map(lambda v:float(np.median(v)),[left,right,bottom,top])
     return np.array([(l+r)/2,(b+t)/2]),[r-l,t-b],scatter
 
@@ -126,7 +126,7 @@ def _field_edges(patch,xaxis,yaxis,width,height):
 def measure_patch(patch,xaxis,yaxis,size_mm,expected_vector,diameter_mm,rectangular=True):
     patch=np.asarray(patch,float);xaxis=finite(xaxis);yaxis=finite(yaxis);expected=finite(expected_vector,2)
     width,height=finite(size_mm,2);x,y=np.meshgrid(xaxis,yaxis)
-    if patch.shape!=x.shape or not np.all(np.isfinite(patch)):raise ValueError('Ungültiger Bildausschnitt.')
+    if patch.shape!=x.shape or not np.all(np.isfinite(patch)):raise ValueError('Invalid image patch.')
     if rectangular:
         centre,measured_size,edge_scatter=_field_edges(patch,xaxis,yaxis,width,height)
     else:
@@ -134,15 +134,15 @@ def measure_patch(patch,xaxis,yaxis,size_mm,expected_vector,diameter_mm,rectangu
         low=float(np.percentile(patch,15));high=float(np.percentile(patch,85))
         binary=ndimage.binary_fill_holes(ndimage.gaussian_filter(patch,.7)>(low+high)/2)
         labels,n=ndimage.label(binary)
-        if not n:raise ValueError('Kein Teilfeld gefunden.')
+        if not n:raise ValueError('No subfield found.')
         sizes=np.bincount(labels.ravel());sizes[0]=0;mask=labels==int(np.argmax(sizes))
         centre=np.array([float(x[mask].mean()),float(y[mask].mean())]);measured_size=[float(np.ptp(x[mask])),float(np.ptp(y[mask]))];edge_scatter=None
     inner=(abs(x-centre[0])<measured_size[0]/2-1.5)&(abs(y-centre[1])<measured_size[1]/2-1.5)
     if not rectangular:
         inner=ndimage.distance_transform_edt(mask,sampling=(yaxis[1]-yaxis[0],xaxis[1]-xaxis[0]))>1.5
-    if inner.sum()<50:raise ValueError('Zu wenig Innenfläche zur Kugelsuche.')
+    if inner.sum()<50:raise ValueError('Insufficient interior area for ball detection.')
     bright=inner&(patch>=np.percentile(patch[inner],55))
-    if bright.sum()<20:raise ValueError('Zu wenig Hintergrundsignal innerhalb des Feldes.')
+    if bright.sum()<20:raise ValueError('Insufficient background signal inside the field.')
     design=np.c_[np.ones(bright.sum()),x[bright],y[bright]]
     coeff=np.linalg.lstsq(design,patch[bright],rcond=None)[0]
     background=coeff[0]+coeff[1]*x+coeff[2]*y
@@ -151,7 +151,7 @@ def measure_patch(patch,xaxis,yaxis,size_mm,expected_vector,diameter_mm,rectangu
     outside=~((abs(x-centre[0])<measured_size[0]/2+2)&(abs(y-centre[1])<measured_size[1]/2+2))
     beam_signal=float(np.median(background[inner])-np.median(patch[outside]))
     noise=float(np.median(abs((patch-background)[bright]-np.median((patch-background)[bright])))*1.4826)
-    if contrast<max(.06*beam_signal,6*noise,1e-8):raise ValueError('Keine ausreichend kontrastreiche Kugel gefunden.')
+    if contrast<max(.06*beam_signal,6*noise,1e-8):raise ValueError('No ball with sufficient contrast found.')
     expected_centre=centre+expected
     fits=[]
     for fraction in (.35,.5,.65):
@@ -169,12 +169,12 @@ def measure_patch(patch,xaxis,yaxis,size_mm,expected_vector,diameter_mm,rectangu
             largest_gap=float(np.max(np.diff(np.r_[angles,angles[0]+2*np.pi])))
             if fit.success and largest_gap<np.pi/3 and .25*diameter_mm<radius<.75*diameter_mm and rms<.45 and np.linalg.norm(bc-expected_centre)<5:
                 candidates.append((bc,radius,rms))
-        if len(candidates)!=1:raise ValueError('Kugelerkennung ist mehrdeutig oder Form/Kontrast passen nicht.')
+        if len(candidates)!=1:raise ValueError('Ball detection is ambiguous or shape/contrast checks failed.')
         fits.append(candidates[0])
     centres=np.array([f[0] for f in fits]);spread=max(float(np.linalg.norm(a-b)) for a in centres for b in centres)
-    if spread>.35:raise ValueError('Kugelzentrum hängt zu stark vom Bildschwellwert ab.')
+    if spread>.35:raise ValueError('Ball centre depends too strongly on the image threshold.')
     bc=centres[1];clearance=min(measured_size[0]/2-abs(bc[0]-centre[0]),measured_size[1]/2-abs(bc[1]-centre[1]))-diameter_mm/2
-    if clearance<.7:raise ValueError('Kugel ist zu nah am Feldrand oder angeschnitten.')
+    if clearance<.7:raise ValueError('Ball is too close to the field edge or truncated.')
     return {'field_center_patch_mm':centre.tolist(),'ball_center_patch_mm':bc.tolist(),
             'measured_vector_mlc_mm':(bc-centre).tolist(),'measured_field_size_mm':measured_size,
             'field_size_error_mm':(np.array(measured_size)-[width,height]).tolist(),
@@ -186,27 +186,27 @@ def measure_patch(patch,xaxis,yaxis,size_mm,expected_vector,diameter_mm,rectangu
 def image_pixels(ds):
     """Decode once, with malformed/unsupported pixel data reported as image errors."""
     try:sign=int(getattr(ds,'PixelIntensityRelationshipSign',None))
-    except (TypeError,ValueError,OverflowError) as exc:raise ValueError('Pixel-Intensitätsrichtung fehlt; keine automatische Polaritätsannahme.') from exc
-    if sign not in (-1,1):raise ValueError('Pixel-Intensitätsrichtung fehlt; keine automatische Polaritätsannahme.')
+    except (TypeError,ValueError,OverflowError) as exc:raise ValueError('Pixel intensity direction is missing; polarity is not assumed automatically.') from exc
+    if sign not in (-1,1):raise ValueError('Pixel intensity direction is missing; polarity is not assumed automatically.')
     try:
         slope,intercept=finite([getattr(ds,'RescaleSlope',1),getattr(ds,'RescaleIntercept',0)],2)
         arr=ds.pixel_array.astype(float)*slope+intercept
     except (AttributeError,KeyError,TypeError,ValueError,RuntimeError,NotImplementedError,OSError) as exc:
-        raise ValueError(f'Pixeldaten fehlen oder können nicht dekodiert werden ({type(exc).__name__}).') from exc
-    if arr.ndim!=2:raise ValueError('Nur einzelne 2D-RTIMAGEs werden unterstützt.')
-    if not np.all(np.isfinite(arr)):raise ValueError('Pixeldaten enthalten nicht endliche Werte.')
+        raise ValueError(f'Pixel data are missing or cannot be decoded ({type(exc).__name__}).') from exc
+    if arr.ndim!=2:raise ValueError('Only single 2D RTIMAGEs are supported.')
+    if not np.all(np.isfinite(arr)):raise ValueError('Pixel data contain non-finite values.')
     return arr if sign==1 else -arr
 
 
 def sample_target(ds,geometry,beam,target,rectangular=True,pixels=None):
     arr=image_pixels(ds) if pixels is None else pixels
     centre=np.array(target['center_mlc_mm']);size=target['size_mm'];step=min(geometry['pixel_iso_mm'])/1.5
-    if not .03<=step<=.6:raise ValueError('Pixelgröße außerhalb des unterstützten Bereichs.')
+    if not .03<=step<=.6:raise ValueError('Pixel size is outside the supported range.')
     xaxis=np.arange(-size[0]/2-7,size[0]/2+7+step/2,step);yaxis=np.arange(-size[1]/2-7,size[1]/2+7+step/2,step)
     xx,yy=np.meshgrid(xaxis+centre[0],yaxis+centre[1]);c=math.radians(beam['collimator_deg'])
     panel=np.stack([xx*np.cos(c)-yy*np.sin(c),xx*np.sin(c)+yy*np.cos(c)],axis=-1)
     pixels=panel_to_pixel(panel,geometry)
-    if np.any(pixels[...,0]<0) or np.any(pixels[...,1]<0) or np.any(pixels[...,0]>arr.shape[0]-1) or np.any(pixels[...,1]>arr.shape[1]-1):raise ValueError('Geplantes Teilfeld liegt außerhalb des Detektors.')
+    if np.any(pixels[...,0]<0) or np.any(pixels[...,1]<0) or np.any(pixels[...,0]>arr.shape[0]-1) or np.any(pixels[...,1]>arr.shape[1]-1):raise ValueError('Planned subfield is outside the detector.')
     patch=ndimage.map_coordinates(arr,[pixels[...,0],pixels[...,1]],order=1,mode='nearest')
     result=measure_patch(patch,xaxis,yaxis,size,target['expected_vector_mlc_mm'],target['projected_diameter_mm'],rectangular=rectangular)
     measured_panel=mlc_to_panel(result['measured_vector_mlc_mm'],beam['collimator_deg'])

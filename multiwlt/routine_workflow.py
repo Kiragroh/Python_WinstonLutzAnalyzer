@@ -20,30 +20,30 @@ def write_json(path,data):
 def load_profile(path):
     from routine_core import project_hfs,mlc_to_panel
     profilepath=Path(path);reference=json.loads(profilepath.read_text(encoding='utf-8'))
-    if reference.get('schema_version')!=1 or reference.get('patient_position')!='HFS':raise ValueError('Nicht unterstütztes Referenzprofil.')
+    if reference.get('schema_version')!=1 or reference.get('patient_position')!='HFS':raise ValueError('Unsupported reference profile.')
     planpath=(profilepath.parent/reference['qa_plan_file']).resolve()
-    if planpath.parent!=profilepath.parent.resolve():raise ValueError('Plan muss neben dem Referenzprofil liegen.')
-    if sha256(planpath)!=reference['qa_plan_sha256']:raise ValueError('QA-RTPLAN wurde seit der Referenzerstellung verändert.')
+    if planpath.parent!=profilepath.parent.resolve():raise ValueError('Plan must be in the same directory as the reference profile.')
+    if sha256(planpath)!=reference['qa_plan_sha256']:raise ValueError('QA RTPLAN has changed since reference generation.')
     plan=pydicom.dcmread(planpath,stop_before_pixels=True);beams=read_static_beams(plan)
-    if hashlib.sha256(str(plan.SOPInstanceUID).encode()).hexdigest()!=reference['qa_plan_sop_hash']:raise ValueError('Planidentität passt nicht zum Profil.')
-    if len(beams)!=len(reference['fields']):raise ValueError('Anzahl der Prüffelder passt nicht zum Profil.')
+    if hashlib.sha256(str(plan.SOPInstanceUID).encode()).hexdigest()!=reference['qa_plan_sop_hash']:raise ValueError('Plan identity does not match the profile.')
+    if len(beams)!=len(reference['fields']):raise ValueError('Number of test fields does not match the profile.')
     balls={b['id']:b for b in reference['balls']}
     for beam,field in zip(beams,reference['fields']):
-        if beam['number']!=field['beam_number'] or len(beam['apertures'])!=len(field['targets']):raise ValueError('Feld-/Teilfeldanzahl stimmt nicht.')
-        if any(abs(beam[k]-field[k])>1e-5 for k in ['gantry_deg','collimator_deg','couch_deg']):raise ValueError('Planwinkel und Referenzwinkel unterscheiden sich.')
-        if not np.allclose(beam['iso_lps_mm'],reference['iso_lps_mm'],atol=.001) or abs(beam['sad_mm']-reference['sad_mm'])>.001:raise ValueError('Plan-Isozentrum oder SAD passt nicht zur Referenz.')
+        if beam['number']!=field['beam_number'] or len(beam['apertures'])!=len(field['targets']):raise ValueError('Beam/subfield count does not match.')
+        if any(abs(beam[k]-field[k])>1e-5 for k in ['gantry_deg','collimator_deg','couch_deg']):raise ValueError('Plan and reference angles differ.')
+        if not np.allclose(beam['iso_lps_mm'],reference['iso_lps_mm'],atol=.001) or abs(beam['sad_mm']-reference['sad_mm'])>.001:raise ValueError('Plan isocentre or SAD does not match the reference.')
         used=set()
         for target in field['targets']:
-            if target['id'] not in balls:raise ValueError('Unbekannte Kugelidentität im Profil.')
+            if target['id'] not in balls:raise ValueError('Unknown ball identity in the profile.')
             projected=project_hfs(balls[target['id']]['center_lps_mm'],reference['iso_lps_mm'],beam['gantry_deg'],beam['collimator_deg'],beam['couch_deg'],reference['sad_mm'])
             distances=[np.linalg.norm(np.array(a['center_mlc_mm'])-target['center_mlc_mm']) for a in beam['apertures']]
             idx=int(np.argmin(distances));aperture=beam['apertures'][idx]
-            if idx in used or distances[idx]>.001 or not aperture['rectangular']:raise ValueError('Routineversion benötigt eindeutig zugeordnete Rechtecköffnungen.')
+            if idx in used or distances[idx]>.001 or not aperture['rectangular']:raise ValueError('Routine analysis requires uniquely assigned rectangular apertures.')
             used.add(idx)
             expected=projected-aperture['center_mlc_mm']
-            if not np.allclose(expected,target['expected_vector_mlc_mm'],atol=.001):raise ValueError('Sollvektor stimmt nicht mit CT und Plan überein.')
-            if not np.allclose(aperture['bounds_mlc_mm'],target['bounds_mlc_mm'],atol=.001):raise ValueError('Öffnungsgrenzen stimmen nicht mit dem Plan überein.')
-            if not np.allclose(mlc_to_panel(expected,beam['collimator_deg']),target['expected_vector_panel_mm'],atol=.001):raise ValueError('Sollvektor-Konvention ist inkonsistent.')
+            if not np.allclose(expected,target['expected_vector_mlc_mm'],atol=.001):raise ValueError('Expected vector is inconsistent with the CT and plan.')
+            if not np.allclose(aperture['bounds_mlc_mm'],target['bounds_mlc_mm'],atol=.001):raise ValueError('Aperture boundaries do not match the plan.')
+            if not np.allclose(mlc_to_panel(expected,beam['collimator_deg']),target['expected_vector_panel_mm'],atol=.001):raise ValueError('Expected-vector convention is inconsistent.')
     return reference,beams,plan
 
 def create_demo_images(profile_path,output_folder,shift_panel_mm=(.7,-.4)):
@@ -52,7 +52,7 @@ def create_demo_images(profile_path,output_folder,shift_panel_mm=(.7,-.4)):
     from pydicom.uid import RTImageStorage
     reference,beams,plan=load_profile(profile_path);shift=finite(shift_panel_mm,2)
     output=Path(output_folder)
-    if output.exists() and any(output.iterdir()):raise ValueError('Demo-Bildordner muss leer sein.')
+    if output.exists() and any(output.iterdir()):raise ValueError('Demo image folder must be empty.')
     output.mkdir(parents=True,exist_ok=True)
     n=1024;spacing=.336;sid=1500.;sad=reference['sad_mm'];origin=np.array([-(n-1)*spacing/2,(n-1)*spacing/2])
     rows,cols=np.indices((n,n));xx=(origin[0]+cols*spacing)*sad/sid;yy=(origin[1]-rows*spacing)*sad/sid

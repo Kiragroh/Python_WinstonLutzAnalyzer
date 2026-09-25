@@ -11,10 +11,10 @@
     }
   ],
   "spheres": {
-    "definition": "Kleinste Kugel, die alle korrigierten Strahlgeraden ber\u00fchrt/schneidet; CT-Kugelmitte je Met als lokaler Ursprung.",
-    "sign_convention": "Strahlungsreferenz relativ zur Kugel: korrigierte Feldprojektion = CT-Kugelprojektion minus (Ist-Soll). LPS: +L links, +P posterior, +S superior.",
-    "coverage": "Nur die aufgenommenen Winkel. Kein Nachweis \u00fcber eine vollst\u00e4ndige Rotation; keine reine Gantry- oder Kollimatorgr\u00f6\u00dfe bei gemischten Achsen.",
-    "primary_metric": "Maximaler zus\u00e4tzlicher 2D-Versatz vor jeder 3D-Anpassung.",
+    "definition": "Smallest sphere intersecting every corrected ray; each target uses its CT ball centre as the local origin.",
+    "sign_convention": "Radiation reference relative to the ball: corrected field projection = CT ball projection minus (observed-expected). LPS: +L left, +P posterior, +S superior.",
+    "coverage": "Sampled angles only. No full-rotation claim; mixed-axis acquisitions do not isolate gantry or collimator performance.",
+    "primary_metric": "Maximum extra 2D displacement before any 3D fit.",
     "reference": "https://pylinac.readthedocs.io/en/latest/winston_lutz.html",
     "per_ball": [
       {
@@ -121,6 +121,6 @@
       0.15668968730010435
     ],
     "mean_diameter_mm": 0.511605467746663,
-    "averaging_note": "Mittelwert der drei Mitten und Durchmesser rein beschreibend. Gemeinsame H\u00fcllkugel nutzt alle Strahlen, ohne gegensinnige Fehler vorab wegzumitteln."
+    "averaging_note": "Mean centres and diameters are descriptive only. The pooled sphere uses all rays without first averaging out opposing errors."
   }
 }
