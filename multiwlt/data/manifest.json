@@ -54,13 +54,13 @@
       "dicom_files": 8
     },
     "all_plans": {
-      "version": "1",
-      "download_url": "https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/releases/download/multiwlt-data-20260925-v1/MultiWLT_All_RTPLANs_v1.zip",
-      "checksum_url": "https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/releases/download/multiwlt-data-20260925-v1/MultiWLT_All_RTPLANs_v1.zip.sha256",
-      "sha256": "fea6ef31f20770c81d4d9449cba07af4aa235c0230f73480c988701dac63e0af",
-      "archive_bytes": 39144,
+      "version": "2",
+      "download_url": "https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/releases/download/multiwlt-data-20260925-v1/MultiWLT_All_RTPLANs_v2.zip",
+      "checksum_url": "https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/releases/download/multiwlt-data-20260925-v1/MultiWLT_All_RTPLANs_v2.zip.sha256",
+      "sha256": "f0b334015c2342f3503d9e5a164eaabe8cc6ea051879fa4cc81301edd889d742",
+      "archive_bytes": 41997,
       "dicom_files": 5,
-      "note": "Five de-identified plans: Standard, R6, BB01 ISO, DCA D2, G0 couch/collimator alpha. Standard has a separate original CT/RS that is not included. All other plans use anatomy v1. Only R6 has initial measured results."
+      "note": "Five de-identified plans. Collection v2 replaces plan 05 with the combined 16-field gantry/couch/collimator alpha plan (first four fields preserve R6). Plans 01-04 unchanged. Standard anatomy is not included; other plans use stable published anatomy v1. Only R6 has measured results."
     }
   },
   "legacy_full_bundle": "Retained unchanged for existing links. Prefer the components for new downloads.",

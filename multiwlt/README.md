@@ -85,7 +85,7 @@ python analyse.py local_data/MV --profile local_data/reference.json --records lo
 
 Use the matching CT-derived reference and RTPLAN, not the synthetic fixture, for acquired data. Plan identity, plan hash, field geometry, image orientation and scale are checked. A changed plan UID requires matching delivery-record evidence; the expected geometry remains the reference plan. Missing or inconsistent metadata fail explicitly. The current detector supports three rectangular openings, normal EPID orientation, HFS geometry, and one image per configured static field. Separate setup/correction states into separate acquisitions; their encoder corrections cannot be mixed silently. A compact PDF measurement report starts with the sphere overview and the maximum extra 2D displacement as its overall metric, followed by measured values and individual MV views. Overlays, CSV and JSON are also produced. Research outlook is kept out of the measurement report. No automatic clinical tolerance decision is made.
 
-[All five de-identified RTPLANs](data/README.md#all-five-rtplans) are also available separately, including the G0 couch/collimator alpha plan. Only the initial R6 acquisition has measured results; the traditional Standard-WLT has a separate original CT/structure reference.
+[All five de-identified RTPLANs](data/README.md#all-five-rtplans) are also available separately, including the combined 16-field gantry/couch/collimator alpha plan (collection v2). Only the initial R6 acquisition has measured results; the traditional Standard-WLT has a separate original CT/structure reference.
 
 ## Use your own phantom, CT and plan
 

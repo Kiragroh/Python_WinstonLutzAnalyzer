@@ -18,13 +18,13 @@ The [original full ZIP](https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/r
 
 ## All five RTPLANs
 
-[Download all five de-identified plans (39 kB)](https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/releases/download/multiwlt-data-20260925-v1/MultiWLT_All_RTPLANs_v1.zip) · [SHA-256](https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/releases/download/multiwlt-data-20260925-v1/MultiWLT_All_RTPLANs_v1.zip.sha256)
+[Download all five de-identified plans (42 kB)](https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/releases/download/multiwlt-data-20260925-v1/MultiWLT_All_RTPLANs_v2.zip) · [SHA-256](https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/releases/download/multiwlt-data-20260925-v1/MultiWLT_All_RTPLANs_v2.zip.sha256)
 
-Includes **traditional Standard-WLT**, **MultiWLT R6**, **BB01-ISO**, **DCA D2** and **G0 couch/collimator variation**. Machine/tolerance labels are `RESEARCH_TB`; patient is `PHANTOM^MULTIWLT` / `MULTIWLT_PHANTOM`. All plans remain UNAPPROVED. The R6 plan is byte-identical to the initial data release. The other plans are preparation/outlook, not additional measured results.
+Includes **traditional Standard-WLT**, **MultiWLT R6**, **BB01-ISO**, **DCA D2** and **combined gantry/couch/collimator variation**. Machine/tolerance labels are `RESEARCH_TB`; patient is `PHANTOM^MULTIWLT` / `MULTIWLT_PHANTOM`. All plans remain UNAPPROVED. The R6 plan is byte-identical to the initial data release. The other plans are preparation/outlook, not additional measured results.
 
-The G0 alpha plan has 12 static fields: four couch angles, three collimators each. The planned openings and profile are verified; device import, collision clearance and acquired-image analysis are pending. It cannot determine a 3D sphere per couch from one gantry direction.
+Collection v2 replaces plan 05 with **16 static fields**: fields 1–4 reproduce R6 (G20/105/195/285, T0), followed by twelve G0 fields with four couch angles and three collimators each. Plans 01–04 are byte-identical to v1. The original four-view routine uses fields 1–4; an eight-image extension adds fields 5/8/11/14; the full extension uses all sixteen. The planned openings and profile are verified; device import, collision clearance and acquired-image analysis are pending. Only T0 has multiple gantry views; the rotated couch positions cannot yield independent 3D spheres from one gantry direction. The public plan references the published anonymized RTSTRUCT, not a local Eclipse UID.
 
-**Standard-WLT anatomy exception:** the traditional plan retains a separate, remapped original CT/RTSTRUCT reference; those objects are not included. It must not be associated with the Brainlab CT by simply changing a UID. Plans R6, BB01, DCA and G0 use the stable Brainlab anatomy package. See the archive README and per-plan catalog before local adaptation/import.
+**Standard-WLT anatomy exception:** the traditional plan retains a separate, remapped original CT/RTSTRUCT reference; those objects are not included. It must not be associated with the Brainlab CT by simply changing a UID. Plans R6, BB01, DCA and the combined plan use the stable Brainlab anatomy package. See the archive README and per-plan catalog before local adaptation/import.
 
 ## Reproduce
 
