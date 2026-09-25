@@ -52,3 +52,5 @@ The GUI supports folder selection, standard WLT reports, exploratory multi-ball 
 Only the initial four-view MultiWLT measurements are presented as acquired results. Couch/collimator variations, comparisons with and without ExacTrac correction, conventional WLT on BB01, and DCA/cine are research outlook. This repository does not operate a treatment machine or establish a clinical tolerance.
 
 Reproducible, deidentified cases, known-shift checks and independent localisation comparisons are welcome. Document the CT/plan reference and acquisition geometry with each case. The software is released under the [MIT licence](LICENSE.txt); dependency and media details for the extension are in [THIRD_PARTY.md](multiwlt/THIRD_PARTY.md).
+
+MultiWLT downloads are separated into [stable CT/RTSTRUCT, versioned plan/reference and initial measurements](multiwlt/data/README.md); plan revisions do not require uploading the CT again.

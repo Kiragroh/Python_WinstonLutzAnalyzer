@@ -20,5 +20,40 @@
   "records_required": true,
   "imported_plan_return_export_included": false,
   "source_plan_included": true,
-  "note": "Phantom data. The source-plan and imported-plan identities remain distinct; use matching records. Raw files are release assets rather than Git source files."
+  "note": "Phantom data. The source-plan and imported-plan identities remain distinct; use matching records. Raw files are release assets rather than Git source files.",
+  "preferred_download": "components",
+  "packages": {
+    "ct_struct": {
+      "version": "1",
+      "download_url": "https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/releases/download/multiwlt-data-20260925-v1/MultiWLT_CT_RTSTRUCT_v1.zip",
+      "checksum_url": "https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/releases/download/multiwlt-data-20260925-v1/MultiWLT_CT_RTSTRUCT_v1.zip.sha256",
+      "sha256": "2c8133268547cf5e67c9a296f7cc2c3ad44907d0d30e37736d4bcc5147d2c56f",
+      "archive_bytes": 77772616,
+      "anatomy_id": "leipzig-brainlab-ct-v1",
+      "note": "Stable phantom CT and structure set. Compatible anatomy ID: leipzig-brainlab-ct-v1. Reuse for compatible future plans; do not regenerate UIDs when repackaging.",
+      "dicom_files": 288
+    },
+    "plan_r6": {
+      "version": "1",
+      "download_url": "https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/releases/download/multiwlt-data-20260925-v1/MultiWLT_RTPLAN_R6_v1.zip",
+      "checksum_url": "https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/releases/download/multiwlt-data-20260925-v1/MultiWLT_RTPLAN_R6_v1.zip.sha256",
+      "sha256": "c5e5a894e049fd081bb634f1dbbc35cc1b3447dd667b329f55544990db643c3b",
+      "archive_bytes": 9262,
+      "anatomy_id": "leipzig-brainlab-ct-v1",
+      "note": "Initial static R6 source RTPLAN plus its matching reference profile. Requires anatomy leipzig-brainlab-ct-v1. Do not combine the reference with a changed RTPLAN: regenerate and validate it. This is not a new plan or a couch-variation plan.",
+      "dicom_files": 1
+    },
+    "measurements": {
+      "version": "1",
+      "download_url": "https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/releases/download/multiwlt-data-20260925-v1/MultiWLT_MV_20260925_v1.zip",
+      "checksum_url": "https://github.com/Kiragroh/Python_WinstonLutzAnalyzer/releases/download/multiwlt-data-20260925-v1/MultiWLT_MV_20260925_v1.zip.sha256",
+      "sha256": "095cc5c99fef083788cca07bc7adae4570396baca36dd5092bec8fe5e6dd0e8e",
+      "archive_bytes": 6161406,
+      "anatomy_id": "leipzig-brainlab-ct-v1",
+      "note": "Four initial MV images, four matching delivery records, example results and original validation. Bound to the initial R6 geometry, not arbitrary future plans. Use --records for the imported/source-plan identity distinction.",
+      "dicom_files": 8
+    }
+  },
+  "legacy_full_bundle": "Retained unchanged for existing links. Prefer the components for new downloads.",
+  "update_policy": "CT/RTSTRUCT v1 is fixed. Version future RTPLANs together with their reference profiles and state the compatible anatomy ID. Initial MV/records remain bound to initial R6."
 }
