@@ -1,0 +1,7 @@
+__pycache__/
+.pytest_cache/
+.venv/
+demo_output/
+results/
+local_data/
+*.zip

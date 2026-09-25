@@ -1,164 +1,50 @@
-# Winston-Lutz Analyzer
+# Winston–Lutz Analyzer
 
-Desktop-Anwendung fuer die Auswertung von Winston-Lutz-Aufnahmen mit Python und
-[`pylinac`](https://pylinac.readthedocs.io/). Das Repository enthaelt eine
-generische Open-Source-Version ohne klinikspezifische Pfade, Betriebsdaten oder
-DICOM-Beispieldaten.
+Python tools for standard Winston–Lutz analysis and CT-referenced, off-isocentre MultiWLT. The desktop application uses [pylinac](https://pylinac.readthedocs.io/); the new [`multiwlt/`](multiwlt/) research module explicitly subtracts the expected CT/plan offset before evaluating measured deviations.
 
-## Funktionen
+## Choose a workflow
 
-### Standard WLT
+| Workflow | Entry point | What it reports |
+|---|---|---|
+| Standard single-ball WLT | Desktop GUI, **Standard WLT** tab | Standard pylinac results and PDF report |
+| Existing multi-ball exploration | Desktop GUI, **Multi-Ball Off-Iso** tab | Detected ball-to-field distances and aperture previews |
+| **CT-referenced MultiWLT** | [`multiwlt/analyse.py`](multiwlt/analyse.py) | Measured minus expected vectors, local 3D ray envelopes, compact PDF |
 
-- Analyse eines Ordners mit WLT-DICOMs ueber `pylinac.WinstonLutz`
-- TXT-Zusammenfassung und kombinierter PDF-Report
-- Kennwerte fuer BB-Abstand und Isozentrum
-- optionale lokale Verlaufs-CSV
-- frei waehlbarer Analyse- und Ausgabeordner
+**The existing GUI multi-ball tab does not apply the new CT-reference correction.** Use the new module's CLI for the corrected workflow. The original desktop application remains available; its [German guide](README.de.md) is preserved.
 
-### Multi-Ball Off-Iso
+## CT-referenced MultiWLT
 
-- Auswertung mehrerer Subfelder und Kugeln pro RTIMAGE
-- automatische oder feste Anzahl erwarteter Subfelder
-- optionale RTPLAN-Zuordnung ueber Gantry-, Kollimator- und Tischwinkel
-- CSV-, JSON-, Preview- und Uebersichtsausgabe
-- Darstellung von Jaws und MLC-Aperturen aus dem zugeordneten RTPLAN
+![Brainlab head phantom used for the initial MultiWLT test](multiwlt/assets/phantom.png)
 
-## Installation
+Four acquired MVHighQuality images, three balls, twelve ball–field pairs. The initial test was performed on **25 September 2026 by Dr. Sebastian Schäfer** in Leipzig. The largest additional 2D displacement was **0.508 mm**; one field-centre method comparison remains flagged for review. These are initial research results, not clinical acceptance criteria.
 
-Voraussetzung ist Python 3.13 oder neuer.
+**Start with the [English MultiWLT guide](multiwlt/README.md).** It includes the measured results, expected-versus-observed plots, a synthetic demo, a machine-name adapter and a tool for inspecting your own CT and plan.
 
-```powershell
+**Expected offsets are specific to the CT ball centres, plan isocentre, angles and apertures.** Do not reuse our offsets for a different CT/plan combination. Even with the same phantom model, verify your own ball layout and derive your own reference. [`inspect_phantom.py`](multiwlt/inspect_phantom.py) performs that check; unsupported ball arrangements, openings or image geometry require adapting and validating the logic.
+
+```sh
 git clone https://github.com/Kiragroh/Python_WinstonLutzAnalyzer.git
-cd Python_WinstonLutzAnalyzer
-py -3.13 -m pip install -U pip
+cd Python_WinstonLutzAnalyzer/multiwlt
+python -m pip install -r requirements.txt
+python demo.py --output demo_output
+python -m pytest tests -q
+```
+
+The demo uses labelled synthetic images and an incomplete synthetic geometry fixture, **not a deliverable treatment plan**. The deidentified acquired-image download is still pending; its link will be added to [`data/manifest.json`](multiwlt/data/manifest.json). No acquired DICOM datasets or institution-specific deployment configuration are committed.
+
+## Existing desktop application
+
+Python 3.13 is the tested interpreter. From the repository root:
+
+```powershell
 py -3.13 -m pip install -r requirements.txt
-```
-
-Start:
-
-```powershell
 .\start_open_gui.cmd
 ```
 
-Installation ohne GUI-Start pruefen:
+The GUI supports folder selection, standard WLT reports, exploratory multi-ball aperture views and local history. Output and saved settings remain local in `output/`. See the [desktop guide](README.de.md) for startup checks, CLI options and screenshots.
 
-```powershell
-.\start_open_gui.cmd -CheckOnly
-```
+## Scope and contribution
 
-Alternativ:
+Only the initial four-view MultiWLT measurements are presented as acquired results. Couch/collimator variations, comparisons with and without ExacTrac correction, conventional WLT on BB01, and DCA/cine are research outlook. This repository does not operate a treatment machine or establish a clinical tolerance.
 
-```powershell
-py -3.13 wlt_open_gui.py
-```
-
-## Ausgabeordner
-
-Ohne weitere Konfiguration nutzt die Anwendung den lokalen Ordner:
-
-```text
-output
-```
-
-In der GUI kann fuer beide Workflows ein beliebiger anderer Ausgabeordner
-gewaehlt und mit `keep` gespeichert werden.
-
-Optional kann vor dem Start ein gemeinsamer Standardordner gesetzt werden:
-
-```powershell
-$env:WLT_OUTPUT_ROOT = "D:\QA-Output"
-.\start_open_gui.cmd
-```
-
-Die Anwendung legt darunter die Unterordner `WLT\Normal` und `WLT\Multi` an.
-Die lokale Einstellung wird in `output\gui_settings.json` gespeichert und ist
-von Git ausgeschlossen.
-
-## Standard-WLT-Ablauf
-
-1. Reiter **Standard WLT** oeffnen.
-2. Ordner mit den WLT-DICOMs waehlen.
-3. Ausgabe im Analyseordner oder in einem separaten Output-Ordner waehlen.
-4. TXT und/oder PDF aktivieren.
-5. **WLT auswerten** starten.
-
-Erzeugte Dateien:
-
-```text
-wlt_results_<timestamp>.txt
-wlt_report_<timestamp>.pdf
-```
-
-Der PDF-Report enthaelt ein kompaktes Deckblatt, eine Bilduebersicht und die
-detaillierten pylinac-Seiten.
-
-## Multi-Ball-Ablauf
-
-Der Workflow sucht getrennte Feldinseln in den RTIMAGE-Daten und bestimmt
-innerhalb jedes Subfelds Feld- und Kugelzentrum. Der Abstand wird mit der
-RTIMAGE-SID auf die Isoebene skaliert:
-
-```text
-distance_iso_mm = distance_detector_mm * 1000 / RTImageSID
-```
-
-Erzeugte Dateien:
-
-```text
-multi_ball_wlt_<timestamp>.csv
-multi_ball_wlt_<timestamp>.json
-multi_ball_wlt_previews_<timestamp>\*.png
-multi_ball_mlc_<timestamp>\*.png
-multi_ball_wlt_graph_<timestamp>.png
-```
-
-Das RTPLAN wird fuer die Beam-Zuordnung und die MLC-/Jaw-Darstellung verwendet,
-nicht fuer die numerische Bestimmung von Feld- oder Kugelzentrum.
-
-## Kommandozeile
-
-```powershell
-python multi_ball_wlt.py ".\path\to\rtimage_folder" `
-  --plan ".\path\to\rtplan.dcm" `
-  --fields 3 `
-  --output ".\output"
-```
-
-Automatische Feldanzahl:
-
-```powershell
-python multi_ball_wlt.py ".\path\to\rtimage_folder" `
-  --fields auto `
-  --output ".\output"
-```
-
-## Oberflaeche
-
-Die Abbildungen verwenden neutrale Platzhalter und enthalten keine klinischen
-DICOM-Daten.
-
-### Standard WLT
-
-![Standard-WLT-Oberflaeche](docs/screenshots/standard_wlt_after.png)
-
-### Multi-Ball MLC-Ansicht
-
-![Multi-Ball MLC-Ansicht](docs/screenshots/multi_ball_mlc_after.png)
-
-### Lokaler Verlauf
-
-![Lokale Verlaufsansicht](docs/screenshots/history_after.png)
-
-## Datenschutz und Einsatzgrenzen
-
-- Keine klinischen DICOMs, Reports oder Ergebnisdaten in Git einchecken.
-- Fuer Tests nur anonymisierte oder synthetische RTIMAGE-/RTPLAN-Daten nutzen.
-- Ergebnisse vor einer praktischen Nutzung anhand der Bild-Previews
-  plausibilisieren.
-- Das Tool ist keine Live-Messung und erzeugt keine Bestrahlungsplaene.
-- Lokale Toleranzen, Koordinaten- und Vorzeichenkonventionen muessen durch den
-  Anwender festgelegt und validiert werden.
-
-## Lizenz
-
-MIT, siehe [LICENSE.txt](LICENSE.txt).
+Reproducible, deidentified cases, known-shift checks and independent localisation comparisons are welcome. Document the CT/plan reference and acquisition geometry with each case. The software is released under the [MIT licence](LICENSE.txt); dependency and media details for the extension are in [THIRD_PARTY.md](multiwlt/THIRD_PARTY.md).

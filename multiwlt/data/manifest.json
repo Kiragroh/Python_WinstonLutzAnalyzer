@@ -1,0 +1,11 @@
+{
+  "status": "awaiting_public_download_link",
+  "download_url": null,
+  "expected_contents": [
+    "deidentified CT reference",
+    "matching RTPLAN and analysis profile",
+    "four MV RTIMAGEs",
+    "matching delivery records where needed"
+  ],
+  "included_acquired_dicom_count": 0
+}

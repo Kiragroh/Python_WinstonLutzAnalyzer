@@ -1,0 +1,126 @@
+{
+  "status": "REVIEW_FIELD_METHOD",
+  "valid_count": 12,
+  "expected_count": 12,
+  "max_extra_mm": 0.5078018874688355,
+  "field_method_review": [
+    {
+      "beam": 4,
+      "ball": "BB03",
+      "difference_mm": 0.6969922411840767
+    }
+  ],
+  "spheres": {
+    "definition": "Kleinste Kugel, die alle korrigierten Strahlgeraden ber\u00fchrt/schneidet; CT-Kugelmitte je Met als lokaler Ursprung.",
+    "sign_convention": "Strahlungsreferenz relativ zur Kugel: korrigierte Feldprojektion = CT-Kugelprojektion minus (Ist-Soll). LPS: +L links, +P posterior, +S superior.",
+    "coverage": "Nur die aufgenommenen Winkel. Kein Nachweis \u00fcber eine vollst\u00e4ndige Rotation; keine reine Gantry- oder Kollimatorgr\u00f6\u00dfe bei gemischten Achsen.",
+    "primary_metric": "Maximaler zus\u00e4tzlicher 2D-Versatz vor jeder 3D-Anpassung.",
+    "reference": "https://pylinac.readthedocs.io/en/latest/winston_lutz.html",
+    "per_ball": [
+      {
+        "status": "sphere_3d",
+        "sample_count": 4,
+        "center_lps_mm": [
+          -0.19680199140520668,
+          -0.2638632706891206,
+          0.02106154070336624
+        ],
+        "center_distance_mm": 0.329846082190792,
+        "radius_mm": 0.23324255167199343,
+        "diameter_mm": 0.46648510334398685,
+        "rms_line_distance_mm": 0.21480294660837854,
+        "condition": 2.0994138245427334,
+        "per_ray_distance_mm": [
+          0.233242551671993,
+          0.23324255167199343,
+          0.23324255167199287,
+          0.14613336290929776
+        ],
+        "id": "BB01",
+        "distance_from_iso_mm": 48.6892120325613,
+        "max_2d_extra_mm": 0.4663645971497974
+      },
+      {
+        "status": "sphere_3d",
+        "sample_count": 4,
+        "center_lps_mm": [
+          -0.14936526596127417,
+          0.31399305209031614,
+          0.23497869503322782
+        ],
+        "center_distance_mm": 0.4196624912428949,
+        "radius_mm": 0.2474739820679687,
+        "diameter_mm": 0.4949479641359374,
+        "rms_line_distance_mm": 0.222938505403753,
+        "condition": 2.075887578262016,
+        "per_ray_distance_mm": [
+          0.2474739820676742,
+          0.24747398206430157,
+          0.2474739820679687,
+          0.1227851512474768
+        ],
+        "id": "BB02",
+        "distance_from_iso_mm": 59.9065609757823,
+        "max_2d_extra_mm": 0.5078018874688355
+      },
+      {
+        "status": "sphere_3d",
+        "sample_count": 4,
+        "center_lps_mm": [
+          0.1846822612245528,
+          -0.19498548244202268,
+          0.214028826163719
+        ],
+        "center_distance_mm": 0.3434169687175952,
+        "radius_mm": 0.2866916678800324,
+        "diameter_mm": 0.5733833357600648,
+        "rms_line_distance_mm": 0.2210720551976654,
+        "condition": 2.079671330398943,
+        "per_ray_distance_mm": [
+          0.28669166788002987,
+          0.11874660331550153,
+          0.13040871786288377,
+          0.2866916678800324
+        ],
+        "id": "BB03",
+        "distance_from_iso_mm": 75.17074831501772,
+        "max_2d_extra_mm": 0.5052427138648766
+      }
+    ],
+    "pooled_all_rays": {
+      "status": "sphere_3d",
+      "sample_count": 12,
+      "center_lps_mm": [
+        0.015413103059257716,
+        -0.12860372106635987,
+        0.16090646175218665
+      ],
+      "center_distance_mm": 0.20656081489875394,
+      "radius_mm": 0.36745074500566044,
+      "diameter_mm": 0.7349014900113209,
+      "rms_line_distance_mm": 0.29176900025361746,
+      "condition": 2.084783172032005,
+      "per_ray_distance_mm": [
+        0.3606717025657242,
+        0.293742175976467,
+        0.36745074500566044,
+        0.0928188564376335,
+        0.34893636906295955,
+        0.28379426276010183,
+        0.19833894473844,
+        0.36745074500565633,
+        0.3674507450056578,
+        0.22895043980660104,
+        0.17294514707601485,
+        0.25989098289039897
+      ]
+    },
+    "mean_centres_lps_mm": [
+      -0.05382833204730935,
+      -0.04828523368027571,
+      0.15668968730010435
+    ],
+    "mean_diameter_mm": 0.511605467746663,
+    "averaging_note": "Mittelwert der drei Mitten und Durchmesser rein beschreibend. Gemeinsame H\u00fcllkugel nutzt alle Strahlen, ohne gegensinnige Fehler vorab wegzumitteln."
+  }
+}
